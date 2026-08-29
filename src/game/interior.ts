@@ -1,0 +1,187 @@
+import type { GameState, MachineId } from '../state';
+import { clickProduction, productionPerSecond } from './clips';
+
+export const PLAYABLE_INTERIOR: MachineId = 'autoClipper';
+export const WIRE_INTERIOR: MachineId = 'wireMachine';
+export const WIRE_TARGET_WIDTH = 24;
+export const WIRE_ROUNDS = 5;
+export const WIRE_COOLDOWN_MS = 30_000;
+export const FACTORY_INTERIOR: MachineId = 'clipFactory';
+export const FACTORY_INSPECTIONS = 8;
+export const FACTORY_COOLDOWN_MS = 40_000;
+export type FactoryQuality = 'standard' | 'deformed';
+export const INTERIOR_SESSION_MS = 18_000;
+export const INTERIOR_COOLDOWN_MS = 45_000;
+export const INTERIOR_SPAWN_MS = 800;
+export const INTERIOR_MAX_LIVE = 3;
+
+export function canOpenInterior(state: GameState, id: MachineId): boolean {
+  return state.machines[id] >= 1;
+}
+
+export function interiorHarvestAmount(state: GameState): number {
+  return Math.max(20, clickProduction(state) * 5, productionPerSecond(state) * 2);
+}
+
+export function applyInteriorHarvest(state: GameState): number {
+  const amount = interiorHarvestAmount(state);
+  state.clips += amount;
+  state.totalClips += amount;
+  state.interiorHarvests += 1;
+  return amount;
+}
+
+export function randomInteriorPosition(random = Math.random): { x: number; y: number } {
+  return {
+    x: 12 + random() * 64,
+    y: 18 + random() * 58,
+  };
+}
+
+export function randomWireTarget(random = Math.random): number {
+  return 8 + random() * (84 - WIRE_TARGET_WIDTH);
+}
+
+export function wireTensionPosition(elapsedMs: number, periodMs = 2_000): number {
+  const phase = ((Math.max(0, elapsedMs) % periodMs) / periodMs) * 2;
+  return phase <= 1 ? phase * 100 : (2 - phase) * 100;
+}
+
+export function isWireCalibrationSuccess(position: number, targetStart: number): boolean {
+  return position >= targetStart && position <= targetStart + WIRE_TARGET_WIDTH;
+}
+
+export function wireCalibrationUnitReward(state: GameState): number {
+  return Math.max(100, productionPerSecond(state) * 30, clickProduction(state) * 50);
+}
+
+export function applyWireCalibrationReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(WIRE_ROUNDS, Math.floor(successes)));
+  const amount = wireCalibrationUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.wireCalibrationSuccesses += safeSuccesses;
+  return amount;
+}
+
+export function factoryInspectionBatch(random = Math.random): FactoryQuality[] {
+  const batch: FactoryQuality[] = ['standard', 'standard', 'standard', 'standard', 'deformed', 'deformed', 'deformed', 'deformed'];
+  for (let index = batch.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.max(0, Math.min(0.999999, random())) * (index + 1));
+    [batch[index], batch[swap]] = [batch[swap]!, batch[index]!];
+  }
+  return batch;
+}
+
+export function factoryQualityUnitReward(state: GameState): number {
+  return Math.max(500, productionPerSecond(state) * 45, clickProduction(state) * 100);
+}
+
+export function applyFactoryQualityReward(state: GameState, correct: number): number {
+  const safeCorrect = Math.max(0, Math.min(FACTORY_INSPECTIONS, Math.floor(correct)));
+  const amount = factoryQualityUnitReward(state) * safeCorrect;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.factoryQualityCorrect += safeCorrect;
+  return amount;
+}
+
+export const TRACE_INTERIOR: MachineId = 'aiLine';
+export const TRACE_ROUNDS = 4;
+export const TRACE_LENGTHS = [3, 3, 4, 4] as const;
+export const TRACE_COOLDOWN_MS = 45_000;
+export const TRACE_STEP_MS = 420;
+export const TRACE_RESULT_MS = 700;
+export const TRACE_REDUCED_OBSERVE_MS = 1_600;
+export type TraceNodeId = 0 | 1 | 2 | 3;
+export const TRACE_NODES: TraceNodeId[] = [0, 1, 2, 3];
+
+export function randomTraceSequence(length: number, random = Math.random): TraceNodeId[] {
+  const sequence: TraceNodeId[] = [];
+  const safeLength = Math.max(1, Math.floor(length));
+  for (let index = 0; index < safeLength; index += 1) {
+    const previous = sequence.at(-1);
+    const options = TRACE_NODES.filter((node) => node !== previous);
+    const pick = Math.floor(Math.max(0, Math.min(0.999999, random())) * options.length);
+    sequence.push(options[pick]!);
+  }
+  return sequence;
+}
+
+export function isTraceStepCorrect(sequence: TraceNodeId[], index: number, choice: TraceNodeId): boolean {
+  return sequence[index] === choice;
+}
+
+export function traceUnitReward(state: GameState): number {
+  return Math.max(800, productionPerSecond(state) * 55, clickProduction(state) * 120);
+}
+
+export function applyTraceReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(TRACE_ROUNDS, Math.floor(successes)));
+  const amount = traceUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.traceAiSuccesses += safeSuccesses;
+  return amount;
+}
+
+export const NANO_INTERIOR: MachineId = 'nanoForge';
+export const NANO_ROUNDS = 4;
+export const NANO_CELLS = 16;
+export const NANO_WASTE = 5;
+export const NANO_COOLDOWN_MS = 50_000;
+export const NANO_RESULT_MS = 700;
+
+export function randomNanoWaste(random = Math.random): number[] {
+  const cells = Array.from({ length: NANO_CELLS }, (_, index) => index);
+  for (let index = cells.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.max(0, Math.min(0.999999, random())) * (index + 1));
+    [cells[index], cells[swap]] = [cells[swap]!, cells[index]!];
+  }
+  return cells.slice(0, NANO_WASTE).sort((left, right) => left - right);
+}
+
+export function isNanoWasteCell(waste: number[], index: number): boolean {
+  return waste.includes(index);
+}
+
+export function nanoPurgeUnitReward(state: GameState): number {
+  return Math.max(1_200, productionPerSecond(state) * 70, clickProduction(state) * 150);
+}
+
+export function applyNanoPurgeReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(NANO_ROUNDS, Math.floor(successes)));
+  const amount = nanoPurgeUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.nanoPurgeSuccesses += safeSuccesses;
+  return amount;
+}
+
+export const SWARM_INTERIOR: MachineId = 'swarmAssembler';
+export const SWARM_ROUNDS = 4;
+export const SWARM_UNITS = 8;
+export const SWARM_TARGETS = [3, 4, 5, 3] as const;
+export const SWARM_COOLDOWN_MS = 50_000;
+export const SWARM_RESULT_MS = 700;
+
+export function swarmTarget(round: number): number {
+  return SWARM_TARGETS[Math.min(Math.max(Math.floor(round), 1), SWARM_ROUNDS) - 1] ?? SWARM_TARGETS[0];
+}
+
+export function isSwarmSyncSuccess(selectedCount: number, target: number): boolean {
+  return selectedCount === target;
+}
+
+export function swarmSyncUnitReward(state: GameState): number {
+  return Math.max(1_500, productionPerSecond(state) * 80, clickProduction(state) * 180);
+}
+
+export function applySwarmSyncReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(SWARM_ROUNDS, Math.floor(successes)));
+  const amount = swarmSyncUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.swarmSyncSuccesses += safeSuccesses;
+  return amount;
+}

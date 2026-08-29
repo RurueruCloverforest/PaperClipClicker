@@ -1,0 +1,327 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+
+const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+
+try {
+  const { createInitialState, MACHINE_IDS, UPGRADE_IDS } = await server.ssrLoadModule('/src/state.ts');
+  const clips = await server.ssrLoadModule('/src/game/clips.ts');
+  const progression = await server.ssrLoadModule('/src/game/progression.ts');
+  const milestones = await server.ssrLoadModule('/src/game/milestones.ts');
+  const achievements = await server.ssrLoadModule('/src/game/achievements.ts');
+  const bonusEvents = await server.ssrLoadModule('/src/game/bonusEvents.ts');
+  const signalLab = await server.ssrLoadModule('/src/game/signalLab.ts');
+  const directives = await server.ssrLoadModule('/src/game/directives.ts');
+  const reboot = await server.ssrLoadModule('/src/game/reboot.ts');
+
+  const state = createInitialState(0);
+  assert.equal(clips.machinePrice(state, 'autoClipper'), 15);
+  assert.equal(clips.machineBatchPrice(state, 'autoClipper', 2), 33);
+
+  state.clips = 100;
+  assert.deepEqual(clips.selectedPurchase(state, 'autoClipper', 'max'), { count: 4, price: 76 });
+  assert.equal(clips.buyMachines(state, 'autoClipper', 'max'), 4);
+  assert.equal(state.machines.autoClipper, 4);
+  assert.equal(state.clips, 24);
+  assert.ok(Math.abs(clips.productionPerSecond(state) - 0.408) < 1e-9);
+
+  state.upgrades.push('qualityCutter', 'selfImprovement', 'recursiveMandate');
+  assert.ok(Math.abs(clips.productionPerSecond(state) - 2.496) < 1e-9);
+
+  assert.equal(milestones.milestoneStatus(9).multiplier, 1);
+  assert.equal(milestones.milestoneStatus(10).multiplier, 2);
+  assert.equal(milestones.milestoneStatus(25).multiplier, 4);
+  assert.equal(milestones.milestoneStatus(50).multiplier, 8);
+  assert.equal(milestones.milestoneStatus(100).multiplier, 16);
+  assert.deepEqual(milestones.crossedMilestones(9, 26).map((item) => item.count), [10, 25]);
+
+  state.machines.autoClipper = 10;
+  assert.ok(Math.abs(clips.machineTotalProduction(state, 'autoClipper') - 12.72) < 1e-9);
+  assert.equal(milestones.totalAchievedMilestones(state), 1);
+
+  const achievementState = createInitialState(0);
+  assert.equal(achievements.unlockedAchievements(achievementState).length, 0);
+  assert.equal(achievements.achievementProductionMultiplier(achievementState), 1);
+  achievementState.totalClips = 1_000_000_000;
+  for (const id of MACHINE_IDS) achievementState.machines[id] = 10;
+  achievementState.upgrades = [...UPGRADE_IDS];
+  assert.equal(achievements.unlockedAchievements(achievementState).length, 14);
+  assert.equal(achievements.achievementProductionMultiplier(achievementState), 1.28);
+  assert.ok(achievements.unlockedAchievementIds(achievementState).includes('fullSpectrum'));
+
+  assert.equal(bonusEvents.nextBonusDelay(() => 0, true), 20);
+  assert.ok(bonusEvents.nextBonusDelay(() => 0.999, true) < 40);
+  assert.equal(bonusEvents.nextBonusDelay(() => 0), 30);
+  assert.ok(bonusEvents.nextBonusDelay(() => 0.999) < 75);
+  assert.equal(bonusEvents.chooseBonusOutcome(() => 0), 'productionCache');
+  assert.equal(bonusEvents.chooseBonusOutcome(() => 0.9), 'inventoryEcho');
+  assert.equal(bonusEvents.nextPrecisionDelay(() => 0, true), 8);
+  assert.ok(bonusEvents.nextPrecisionDelay(() => 0.999, true) < 16);
+  assert.equal(bonusEvents.nextPrecisionDelay(() => 0), 12);
+  assert.ok(bonusEvents.nextPrecisionDelay(() => 0.999) < 28);
+  assert.equal(bonusEvents.precisionClickTarget(() => 0), 3);
+  assert.equal(bonusEvents.precisionClickTarget(() => 0.999), 7);
+  assert.equal(bonusEvents.precisionPosition(() => 0), 0);
+  assert.equal(bonusEvents.precisionPosition(() => 0.999), 5);
+  const bonusState = createInitialState(0);
+  assert.equal(bonusEvents.calculateBonusReward(bonusState, 'productionCache'), 100);
+  bonusState.clips = 10_000;
+  const echoReward = bonusEvents.applyBonusReward(bonusState, 'inventoryEcho');
+  assert.equal(echoReward.amount, 1_000);
+  assert.equal(bonusState.clips, 11_000);
+  assert.equal(bonusState.totalClips, 1_000);
+  assert.equal(bonusState.bonusEventsCollected, 1);
+  const precisionReward = bonusEvents.applyPrecisionReward(bonusState, 3);
+  assert.equal(precisionReward, 250);
+  assert.equal(bonusState.precisionTargetsCompleted, 1);
+
+  const signalState = createInitialState(0);
+  signalState.clips = 100_000;
+  assert.equal(signalLab.signalBuffCost('productionSurge', 0), 1_000);
+  assert.equal(signalLab.signalBuffCost('precisionAssist', 10), 6_000);
+  assert.equal(signalLab.activateSignalBuff(signalState, 'productionSurge', 0, 1_000), true);
+  assert.equal(signalState.clips, 99_000);
+  assert.equal(signalLab.isSignalBuffActive(signalState, 'productionSurge', 1_001), true);
+  assert.equal(signalLab.signalEquipmentMultiplier(signalState, 1_001), 2);
+  assert.equal(signalLab.signalClickMultiplier(signalState, 1_001), 1);
+  assert.equal(signalLab.activateSignalBuff(signalState, 'productionSurge', 0, 1_001), false);
+  signalState.signalBuffExpiresAt.precisionAssist = 999_999;
+  signalState.signalBuffExpiresAt.signalBeacon = 999_999;
+  assert.equal(signalLab.signalEquipmentMultiplier(signalState, 2_000), 3);
+  assert.equal(signalLab.signalClickMultiplier(signalState, 2_000), 3);
+  assert.equal(signalLab.signalIntervalMultiplier(signalState, 2_000), 0.6);
+  assert.equal(signalLab.anomalyRewardMultiplier(signalState, 2_000), 3);
+  assert.equal(signalLab.precisionRewardMultiplier(signalState, 2_000), 3);
+  assert.equal(signalLab.precisionDuration(signalState, 4, 2_000), 5);
+
+  const directiveState = createInitialState(0);
+  directiveState.clips = 100;
+  assert.equal(directives.directiveTarget(directiveState, 'manualCalibration'), 25);
+  assert.equal(directives.directiveTarget(directiveState, 'procurementOrder'), 10);
+  assert.equal(directives.directiveTarget(directiveState, 'signalCapture'), 3);
+  assert.equal(directives.directiveReward(directiveState, 'manualCalibration'), 250);
+  directives.advanceDirective(directiveState, 'manualCalibration', 27);
+  assert.equal(directives.canClaimDirective(directiveState, 'manualCalibration'), true);
+  assert.equal(directives.claimDirective(directiveState, 'manualCalibration'), 250);
+  assert.equal(directiveState.directiveProgress.manualCalibration, 2);
+  assert.equal(directiveState.directiveCompletions.manualCalibration, 1);
+  assert.equal(directives.directiveTarget(directiveState, 'manualCalibration'), 30);
+  assert.equal(directives.directiveReward(directiveState, 'manualCalibration'), 313);
+
+  const rebootState = createInitialState(0);
+  rebootState.totalClips = 4_000_000_000;
+  rebootState.clips = 123;
+  rebootState.machines.autoClipper = 10;
+  rebootState.settings.theme = 'dark';
+  rebootState.purchaseMode = 'max';
+  assert.equal(reboot.rebootCoreGain(rebootState), 2);
+  assert.equal(reboot.canReboot(rebootState), true);
+  const rebooted = reboot.createRebootedState(rebootState, 10);
+  assert.equal(rebooted.optimizationCores, 2);
+  assert.equal(rebooted.rebootCount, 1);
+  assert.equal(rebooted.totalClips, 0);
+  assert.equal(rebooted.machines.autoClipper, 0);
+  assert.equal(rebooted.settings.theme, 'dark');
+  assert.equal(rebooted.purchaseMode, 'max');
+  assert.equal(reboot.rebootMultiplier(rebooted), 1.5);
+  assert.equal(clips.clickProduction(rebooted), 1.5);
+
+  state.totalClips = 50_000;
+  const unlocked = clips.updateUnlocks(state);
+  assert.ok(unlocked.includes('nanoForge'));
+  assert.equal(progression.currentPhase(state).id, 'nano');
+  assert.equal(progression.nextProductionGoal(state).name, 'スウォーム組立群');
+
+  state.totalClips = 50_000_000;
+  clips.updateUnlocks(state);
+  assert.equal(state.unlockedMachines.length, 8);
+  assert.equal(progression.currentPhase(state).id, 'matter');
+
+  let storedSave = JSON.stringify({ ...state, purchaseMode: 'max', bonusEventsCollected: 7, precisionTargetsCompleted: 4, signalBuffExpiresAt: { productionSurge: 5_000, precisionAssist: 0, signalBeacon: 0 }, directiveProgress: { manualCalibration: 9, procurementOrder: 2, signalCapture: 1 }, directiveCompletions: { manualCalibration: 3, procurementOrder: 1, signalCapture: 2 }, lastSavedAt: 1_000 });
+  globalThis.localStorage = {
+    getItem: () => storedSave,
+    setItem: (_key, value) => { storedSave = value; },
+    removeItem: () => { storedSave = null; },
+  };
+  const save = await server.ssrLoadModule('/src/save.ts');
+  const loaded = save.loadGame(1_000);
+  assert.equal(loaded.state.purchaseMode, 'max');
+  assert.equal(loaded.state.machines.matterCompiler, state.machines.matterCompiler);
+  assert.equal(loaded.state.bonusEventsCollected, 7);
+  assert.equal(loaded.state.precisionTargetsCompleted, 4);
+  assert.equal(loaded.state.signalBuffExpiresAt.productionSurge, 5_000);
+  assert.equal(loaded.state.directiveProgress.manualCalibration, 9);
+  assert.equal(loaded.state.directiveCompletions.signalCapture, 2);
+  assert.equal(loaded.state.optimizationCores, 0);
+
+  state.totalClips = 500_000_000_000;
+  clips.updateUnlocks(state);
+  assert.equal(state.unlockedMachines.length, 12);
+  assert.equal(progression.currentPhase(state).id, 'causal');
+
+  assert.equal(clips.criticalChance(state), 0.05);
+  assert.equal(clips.criticalMultiplier(state), 5);
+  state.upgrades.push('overloadProtocol', 'resonanceAmplification');
+  assert.equal(clips.criticalChance(state), 0.1);
+  assert.equal(clips.criticalMultiplier(state), 8);
+
+  assert.equal(clips.machinePrice(createInitialState(0), 'planetaryAssembler'), 1_800_000_000);
+  assert.equal(clips.machinePrice(createInitialState(0), 'causalOptimizer'), 2_100_000_000_000);
+
+  const autoState = createInitialState(0);
+  assert.equal(clips.isAutoBuyUnlocked(autoState), false);
+  assert.deepEqual(clips.autoBuyTick(autoState), []);
+  autoState.clips = 1_100;
+  autoState.autoBuyEnabled.autoClipper = true;
+  assert.deepEqual(clips.autoBuyTick(autoState), []);
+  autoState.upgrades.push('autoBuyCore');
+  assert.equal(clips.isAutoBuyUnlocked(autoState), true);
+  const boughtIds = clips.autoBuyTick(autoState);
+  assert.deepEqual(boughtIds, ['autoClipper']);
+  assert.equal(autoState.machines.autoClipper, 1);
+  assert.equal(autoState.clips, 1_085);
+  autoState.autoBuyEnabled.autoClipper = false;
+  autoState.autoBuyEnabled.wireMachine = true;
+  assert.deepEqual(clips.autoBuyTick(autoState), []);
+
+  let autoSave = JSON.stringify({ ...autoState, autoBuyEnabled: { autoClipper: true } });
+  globalThis.localStorage = {
+    getItem: () => autoSave,
+    setItem: (_key, value) => { autoSave = value; },
+    removeItem: () => { autoSave = null; },
+  };
+  const autoLoaded = save.loadGame(0);
+  assert.equal(autoLoaded.state.autoBuyEnabled.autoClipper, true);
+  assert.equal(autoLoaded.state.autoBuyEnabled.wireMachine, false);
+
+  const observation = await server.ssrLoadModule('/src/game/observation.ts');
+  const observeState = createInitialState(0);
+  assert.equal(observation.phaseRewardAmount(observeState), 100);
+  observeState.machines.autoClipper = 10;
+  const expectedReward = Math.max(100, clips.productionPerSecond(observeState) * 90);
+  assert.equal(observation.phaseRewardAmount(observeState), expectedReward);
+  observeState.totalClips = 50;
+  observeState.clips = 50;
+  const firstGrant = observation.grantDuePhaseRewards(observeState);
+  assert.equal(firstGrant.length, 1);
+  assert.equal(firstGrant[0].phase.id, 'mechanized');
+  assert.equal(observeState.phaseRewardsGranted.includes('mechanized'), true);
+  const clipsAfterGrant = observeState.clips;
+  const secondGrant = observation.grantDuePhaseRewards(observeState);
+  assert.equal(secondGrant.length, 0);
+  assert.equal(observeState.clips, clipsAfterGrant);
+
+  observeState.totalClips = 5_000_000_000;
+  const multiGrant = observation.grantDuePhaseRewards(observeState);
+  assert.ok(multiGrant.length >= 5);
+  assert.equal(multiGrant.at(-1).phase.id, 'stellar');
+
+  const legacySave = JSON.stringify({
+    version: 1,
+    clips: 80_000,
+    totalClips: 80_000,
+    machines: { autoClipper: 1 },
+    upgrades: [],
+    unlockedMachines: ['autoClipper'],
+    playTimeSeconds: 10,
+    startedAt: 0,
+    lastSavedAt: 0,
+    settings: { theme: 'dark', compactNumbers: true },
+    purchaseMode: 1,
+    bonusEventsCollected: 0,
+    autoBuyEnabled: {},
+  });
+  globalThis.localStorage = {
+    getItem: () => legacySave,
+    setItem: () => {},
+    removeItem: () => {},
+  };
+  const legacyLoaded = save.loadGame(0);
+  assert.ok(legacyLoaded.state.phaseRewardsGranted.includes('nano'));
+  assert.equal(legacyLoaded.state.clips, 80_000);
+  assert.equal(legacyLoaded.state.interiorHarvests, 0);
+  assert.equal(legacyLoaded.state.traceAiSuccesses, 0);
+  assert.equal(legacyLoaded.state.nanoPurgeSuccesses, 0);
+  assert.equal(legacyLoaded.state.swarmSyncSuccesses, 0);
+
+  const interior = await server.ssrLoadModule('/src/game/interior.ts');
+  const interiorState = createInitialState(0);
+  assert.equal(interior.canOpenInterior(interiorState, 'autoClipper'), false);
+  interiorState.machines.autoClipper = 1;
+  assert.equal(interior.canOpenInterior(interiorState, 'autoClipper'), true);
+  assert.equal(interior.interiorHarvestAmount(interiorState), 20);
+  interiorState.machines.autoClipper = 100;
+  const expectedHarvest = Math.max(20, clips.clickProduction(interiorState) * 5, clips.productionPerSecond(interiorState) * 2);
+  assert.equal(interior.interiorHarvestAmount(interiorState), expectedHarvest);
+  assert.ok(expectedHarvest > 20);
+  const harvested = interior.applyInteriorHarvest(interiorState);
+  assert.equal(harvested, expectedHarvest);
+  assert.equal(interiorState.clips, expectedHarvest);
+  assert.equal(interiorState.totalClips, expectedHarvest);
+  assert.equal(interiorState.interiorHarvests, 1);
+  const point = interior.randomInteriorPosition(() => 0);
+  assert.equal(interior.randomWireTarget(() => 0), 8);
+  assert.equal(interior.randomWireTarget(() => 1), 68);
+  assert.equal(interior.wireTensionPosition(0), 0);
+  assert.equal(interior.wireTensionPosition(500), 50);
+  assert.equal(interior.wireTensionPosition(1_000), 100);
+  assert.equal(interior.wireTensionPosition(1_500), 50);
+  assert.equal(interior.isWireCalibrationSuccess(32, 20), true);
+  assert.equal(interior.isWireCalibrationSuccess(45, 20), false);
+  const wireState = createInitialState(0);
+  wireState.machines.wireMachine = 1;
+  const wireReward = interior.applyWireCalibrationReward(wireState, 3);
+  assert.equal(wireReward, 300);
+  assert.equal(wireState.wireCalibrationSuccesses, 3);
+  const factoryBatch = interior.factoryInspectionBatch(() => 0.5);
+  assert.equal(factoryBatch.length, 8);
+  assert.equal(factoryBatch.filter((item) => item === 'standard').length, 4);
+  assert.equal(factoryBatch.filter((item) => item === 'deformed').length, 4);
+  const factoryState = createInitialState(0);
+  factoryState.machines.clipFactory = 1;
+  const factoryReward = interior.applyFactoryQualityReward(factoryState, 6);
+  assert.equal(factoryReward, 3_000);
+  assert.equal(factoryState.factoryQualityCorrect, 6);
+  const traceShort = interior.randomTraceSequence(3, () => 0);
+  assert.deepEqual(traceShort, [0, 1, 0]);
+  const traceLong = interior.randomTraceSequence(4, () => 0.999);
+  assert.deepEqual(traceLong, [3, 2, 3, 2]);
+  assert.equal(traceShort.every((node, index) => index === 0 || node !== traceShort[index - 1]), true);
+  assert.equal(interior.isTraceStepCorrect(traceShort, 0, 0), true);
+  assert.equal(interior.isTraceStepCorrect(traceShort, 1, 0), false);
+  const traceState = createInitialState(0);
+  const traceReward = interior.applyTraceReward(traceState, 3);
+  assert.equal(traceReward, 2_400);
+  assert.equal(traceState.traceAiSuccesses, 3);
+  assert.equal(traceState.clips, 2_400);
+  assert.equal(traceState.totalClips, 2_400);
+  const nanoWaste = interior.randomNanoWaste(() => 0);
+  assert.equal(nanoWaste.length, 5);
+  assert.equal(new Set(nanoWaste).size, 5);
+  assert.equal(nanoWaste.every((cell) => cell >= 0 && cell < 16), true);
+  assert.equal(interior.isNanoWasteCell(nanoWaste, nanoWaste[0]), true);
+  const nanoClean = [...Array(16).keys()].find((cell) => !nanoWaste.includes(cell));
+  assert.equal(interior.isNanoWasteCell(nanoWaste, nanoClean), false);
+  const nanoState = createInitialState(0);
+  const nanoReward = interior.applyNanoPurgeReward(nanoState, 3);
+  assert.equal(nanoReward, 3_600);
+  assert.equal(nanoState.nanoPurgeSuccesses, 3);
+  assert.equal(nanoState.clips, 3_600);
+  assert.equal(interior.swarmTarget(1), 3);
+  assert.equal(interior.swarmTarget(2), 4);
+  assert.equal(interior.swarmTarget(3), 5);
+  assert.equal(interior.swarmTarget(4), 3);
+  assert.equal(interior.isSwarmSyncSuccess(4, 4), true);
+  assert.equal(interior.isSwarmSyncSuccess(3, 4), false);
+  const swarmState = createInitialState(0);
+  const swarmReward = interior.applySwarmSyncReward(swarmState, 3);
+  assert.equal(swarmReward, 4_500);
+  assert.equal(swarmState.swarmSyncSuccesses, 3);
+  assert.equal(swarmState.clips, 4_500);
+  assert.equal(point.x, 12);
+  assert.equal(point.y, 18);
+
+  console.log('Game logic checks passed.');
+} finally {
+  await server.close();
+}
