@@ -25,6 +25,7 @@ import { chargeDispatch, collectDispatch as recoverDispatch, dispatchStatus, sta
 import { PATCH_BONUS, buyPatch as applyPatch } from './game/patch';
 import { WIND_MAX_SECONDS, isWindReady, releaseWind } from './game/wind';
 import { claimPulse as takePulse } from './game/pulse';
+import { claimScrap as emptyScrap } from './game/scrap';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -672,6 +673,16 @@ const ui = new GameUi(app, {
     const message = `同期パルス：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
     ui.announce(message, 'success');
     ui.addLog('PING', message);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  claimScrap: () => {
+    const amount = emptyScrap(state);
+    if (amount <= 0) return;
+    const message = `端材回収：+${Math.floor(amount).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('SCRAP', message);
     updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);

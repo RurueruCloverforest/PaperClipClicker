@@ -8,6 +8,7 @@ import { comboMultiplier } from './combo';
 import { overclockMultiplier } from './overclock';
 import { catalystMultiplier } from './catalyst';
 import { patchMultiplier } from './patch';
+import { chargeScrap } from './scrap';
 
 export function machinePrice(state: GameState, id: MachineId): number {
   const machine = getMachine(id);
@@ -99,6 +100,7 @@ export function buyMachines(state: GameState, id: MachineId, mode: PurchaseMode)
   if (purchase.count < 1 || state.clips + Number.EPSILON < purchase.price) return 0;
   state.clips -= purchase.price;
   state.machines[id] += purchase.count;
+  chargeScrap(state, purchase.price, productionPerSecond(state));
   return purchase.count;
 }
 
@@ -108,6 +110,7 @@ export function buyUpgrade(state: GameState, id: UpgradeId): boolean {
   if (!upgrade.isUnlocked(state) || state.clips + Number.EPSILON < upgrade.price) return false;
   state.clips -= upgrade.price;
   state.upgrades.push(id);
+  chargeScrap(state, upgrade.price, productionPerSecond(state));
   return true;
 }
 

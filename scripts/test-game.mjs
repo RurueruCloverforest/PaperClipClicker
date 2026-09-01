@@ -24,6 +24,7 @@ try {
   const patch = await server.ssrLoadModule('/src/game/patch.ts');
   const wind = await server.ssrLoadModule('/src/game/wind.ts');
   const pulse = await server.ssrLoadModule('/src/game/pulse.ts');
+  const scrap = await server.ssrLoadModule('/src/game/scrap.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -343,6 +344,26 @@ try {
   assert.equal(pulse.claimPulse(pulseState, 10, pulseNow), 0);
   assert.equal(pulse.claimPulse(pulseState, 10, pulseNow + 20_000), 80);
 
+  assert.equal(scrap.scrapCapacity(0), 30);
+  assert.equal(scrap.scrapCapacity(10), 200);
+  const scrapState = createInitialState(0);
+  scrapState.totalClips = 110;
+  assert.equal(scrap.isScrapUnlocked(scrapState), true);
+  assert.equal(scrap.chargeScrap(scrapState, 100, 10), 8);
+  assert.equal(scrapState.scrapStored, 8);
+  const scrapClaimed = scrap.claimScrap(scrapState);
+  assert.equal(scrapClaimed, 8);
+  assert.equal(scrapState.scrapStored, 0);
+  assert.equal(scrapState.scrapClaims, 1);
+  assert.equal(scrap.claimScrap(scrapState), 0);
+  scrapState.scrapStored = 199;
+  assert.equal(scrap.chargeScrap(scrapState, 100, 10), 1);
+  const buyScrap = createInitialState(0);
+  buyScrap.totalClips = 110;
+  buyScrap.clips = 15;
+  assert.equal(clips.buyMachines(buyScrap, 'autoClipper', 1), 1);
+  assert.ok(Math.abs(buyScrap.scrapStored - 1.2) < 1e-9);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -488,6 +509,8 @@ try {
   assert.equal(legacyLoaded.state.windCount, 0);
   assert.equal(legacyLoaded.state.pulseReadyAt, 0);
   assert.equal(legacyLoaded.state.pulseCount, 0);
+  assert.equal(legacyLoaded.state.scrapStored, 0);
+  assert.equal(legacyLoaded.state.scrapClaims, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
