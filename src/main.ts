@@ -10,7 +10,7 @@ import { grantDuePhaseRewards } from './game/observation';
 import { crossedMilestones } from './game/milestones';
 import { ACHIEVEMENTS, unlockedAchievementIds } from './game/achievements';
 import { applyBonusReward, applyPrecisionReward, chooseBonusOutcome, nextBonusDelay, nextPrecisionDelay, precisionClickTarget, precisionPosition } from './game/bonusEvents';
-import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
+import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, STELLAR_COOLDOWN_MS, STELLAR_INTERIOR, STELLAR_PETALS, STELLAR_RESULT_MS, STELLAR_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applyStellarSyncReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isStellarSyncSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomStellarMask, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
@@ -117,6 +117,15 @@ let planetResults: boolean[] = [];
 let planetPhase: 'play' | 'result' | 'cooldown' = 'play';
 let planetNextRoundAt = 0;
 let planetCooldownUntil = 0;
+let stellarRound = 1;
+let stellarSuccesses = 0;
+let stellarAttempts = 0;
+let stellarTarget = Array.from({ length: STELLAR_PETALS }, () => false);
+let stellarOpen = Array.from({ length: STELLAR_PETALS }, () => false);
+let stellarResults: boolean[] = [];
+let stellarPhase: 'play' | 'result' | 'cooldown' = 'play';
+let stellarNextRoundAt = 0;
+let stellarCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 
 function prefersReducedMotion(): boolean {
@@ -282,6 +291,28 @@ function beginPlanetRound(): void {
   planetPhase = 'play';
   planetNextRoundAt = 0;
   renderPlanetConsole(`STRIP · 次は ${['N', 'E', 'S', 'W'][planetOrder[0] ?? 0]}`, false);
+}
+
+function renderStellarConsole(message = '目標と同じ羽根を開いて同調してください', disabled = stellarPhase !== 'play' || performance.now() < stellarCooldownUntil): void {
+  const waiting = performance.now() < stellarCooldownUntil;
+  ui.setStellarSync(
+    stellarRound,
+    stellarSuccesses,
+    stellarTarget,
+    stellarOpen,
+    stellarResults,
+    waiting ? 'cooldown' : stellarPhase,
+    message,
+    disabled,
+  );
+}
+
+function beginStellarRound(): void {
+  stellarTarget = randomStellarMask();
+  stellarOpen = Array.from({ length: STELLAR_PETALS }, () => false);
+  stellarPhase = 'play';
+  stellarNextRoundAt = 0;
+  renderStellarConsole(`ALIGN · ${stellarTarget.filter(Boolean).length}枚を開放`, false);
 }
 
 function finishPlanetRound(now: number): void {
@@ -536,6 +567,16 @@ const ui = new GameUi(app, {
       planetPhase = now < planetCooldownUntil ? 'cooldown' : 'play';
       if (now < planetCooldownUntil) renderPlanetConsole(`再採掘待機 · 残り${Math.ceil((planetCooldownUntil - now) / 1000)}秒`, true);
       else beginPlanetRound();
+    } else if (id === STELLAR_INTERIOR) {
+      stellarRound = 1;
+      stellarSuccesses = 0;
+      stellarAttempts = 0;
+      stellarResults = [];
+      stellarTarget = Array.from({ length: STELLAR_PETALS }, () => false);
+      stellarOpen = Array.from({ length: STELLAR_PETALS }, () => false);
+      stellarPhase = now < stellarCooldownUntil ? 'cooldown' : 'play';
+      if (now < stellarCooldownUntil) renderStellarConsole(`再同調待機 · 残り${Math.ceil((stellarCooldownUntil - now) / 1000)}秒`, true);
+      else beginStellarRound();
     }
   },
   closeInterior: () => {
@@ -556,6 +597,7 @@ const ui = new GameUi(app, {
     if (interiorMachine === ORBITAL_INTERIOR && orbitalAttempts > 0 && orbitalAttempts < ORBITAL_ROUNDS) orbitalCooldownUntil = performance.now() + ORBITAL_COOLDOWN_MS;
     if (interiorMachine === MATTER_INTERIOR && matterAttempts > 0 && matterAttempts < MATTER_ROUNDS) matterCooldownUntil = performance.now() + MATTER_COOLDOWN_MS;
     if (interiorMachine === PLANET_INTERIOR && planetAttempts > 0 && planetAttempts < PLANET_ROUNDS) planetCooldownUntil = performance.now() + PLANET_COOLDOWN_MS;
+    if (interiorMachine === STELLAR_INTERIOR && stellarAttempts > 0 && stellarAttempts < STELLAR_ROUNDS) stellarCooldownUntil = performance.now() + STELLAR_COOLDOWN_MS;
     interiorMachine = null;
     interiorSessionHarvests = 0;
     interiorSessionAmount = 0;
@@ -818,6 +860,38 @@ const ui = new GameUi(app, {
     renderPlanetConsole('CLEARED · 地殻を剥離', true);
     finishPlanetRound(now);
   },
+  toggleStellarPetal: (index) => {
+    if (interiorMachine !== STELLAR_INTERIOR || performance.now() < stellarCooldownUntil || stellarPhase !== 'play' || stellarAttempts >= STELLAR_ROUNDS) return;
+    if (index < 0 || index >= STELLAR_PETALS) return;
+    stellarOpen[index] = !stellarOpen[index];
+    const openCount = stellarOpen.filter(Boolean).length;
+    renderStellarConsole(`ALIGN · ${openCount} / ${stellarTarget.filter(Boolean).length}`, false);
+  },
+  lockStellarArray: () => {
+    const now = performance.now();
+    if (interiorMachine !== STELLAR_INTERIOR || now < stellarCooldownUntil || stellarPhase !== 'play' || stellarAttempts >= STELLAR_ROUNDS) return;
+    const success = isStellarSyncSuccess(stellarOpen, stellarTarget);
+    stellarResults.push(success);
+    if (success) stellarSuccesses += 1;
+    stellarAttempts += 1;
+    stellarPhase = 'result';
+    renderStellarConsole(success ? 'LOCKED · 集光同調' : 'FLARE · 配置不一致', true);
+    if (stellarAttempts >= STELLAR_ROUNDS) {
+      const reward = applyStellarSyncReward(state, stellarSuccesses);
+      stellarCooldownUntil = now + STELLAR_COOLDOWN_MS;
+      stellarPhase = 'cooldown';
+      const message = `集光同調：${stellarSuccesses} / ${STELLAR_ROUNDS}成功${reward > 0 ? ` +${Math.floor(reward).toLocaleString('ja-JP')}クリップ` : ''}`;
+      ui.setInteriorStatus(message);
+      ui.announce(message, stellarSuccesses > 0 ? 'success' : 'warning');
+      ui.addLog('STAR', message);
+      renderStellarConsole('STANDBY · 再同調待機', true);
+      updateProgressionEvents();
+      ui.render(state, true);
+      saveGame(state);
+    } else {
+      stellarNextRoundAt = now + STELLAR_RESULT_MS;
+    }
+  },
   changePurchaseMode: (mode) => {
     state.purchaseMode = mode;
     ui.addLog('MODE', `購入数量を${mode === 'max' ? 'MAX' : `×${mode}`}へ変更`);
@@ -862,6 +936,7 @@ const ui = new GameUi(app, {
     orbitalCooldownUntil = 0;
     matterCooldownUntil = 0;
     planetCooldownUntil = 0;
+    stellarCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -901,6 +976,7 @@ const ui = new GameUi(app, {
     orbitalCooldownUntil = 0;
     matterCooldownUntil = 0;
     planetCooldownUntil = 0;
+    stellarCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1180,6 +1256,20 @@ const loop = new GameLoop((elapsedSeconds) => {
     } else if (planetPhase === 'result' && planetNextRoundAt > 0 && now >= planetNextRoundAt) {
       planetRound += 1;
       beginPlanetRound();
+    }
+  }
+  if (interiorMachine === STELLAR_INTERIOR) {
+    if (now < stellarCooldownUntil) {
+      renderStellarConsole(`再同調待機 · 残り${Math.ceil((stellarCooldownUntil - now) / 1000)}秒`, true);
+    } else if (stellarPhase === 'cooldown') {
+      stellarRound = 1;
+      stellarSuccesses = 0;
+      stellarAttempts = 0;
+      stellarResults = [];
+      beginStellarRound();
+    } else if (stellarPhase === 'result' && stellarNextRoundAt > 0 && now >= stellarNextRoundAt) {
+      stellarRound += 1;
+      beginStellarRound();
     }
   }
   ui.render(state);

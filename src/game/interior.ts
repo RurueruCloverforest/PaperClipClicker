@@ -339,3 +339,38 @@ export function applyPlanetStripReward(state: GameState, successes: number): num
   state.planetStripSuccesses += safeSuccesses;
   return amount;
 }
+
+export const STELLAR_INTERIOR: MachineId = 'stellarHarvester';
+export const STELLAR_ROUNDS = 4;
+export const STELLAR_PETALS = 6;
+export const STELLAR_COOLDOWN_MS = 60_000;
+export const STELLAR_RESULT_MS = 700;
+
+export function randomStellarMask(random = Math.random): boolean[] {
+  const openCount = 2 + Math.floor(Math.max(0, Math.min(0.999999, random())) * 3);
+  const indices = Array.from({ length: STELLAR_PETALS }, (_, index) => index);
+  for (let index = indices.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.max(0, Math.min(0.999999, random())) * (index + 1));
+    [indices[index], indices[swap]] = [indices[swap]!, indices[index]!];
+  }
+  const mask = Array.from({ length: STELLAR_PETALS }, () => false);
+  for (let index = 0; index < openCount; index += 1) mask[indices[index]!] = true;
+  return mask;
+}
+
+export function isStellarSyncSuccess(open: boolean[], target: boolean[]): boolean {
+  return open.length === target.length && open.every((on, index) => on === target[index]);
+}
+
+export function stellarSyncUnitReward(state: GameState): number {
+  return Math.max(3_500, productionPerSecond(state) * 140, clickProduction(state) * 340);
+}
+
+export function applyStellarSyncReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(STELLAR_ROUNDS, Math.floor(successes)));
+  const amount = stellarSyncUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.stellarSyncSuccesses += safeSuccesses;
+  return amount;
+}

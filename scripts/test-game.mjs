@@ -246,6 +246,7 @@ try {
   assert.equal(legacyLoaded.state.orbitalBerthSuccesses, 0);
   assert.equal(legacyLoaded.state.matterCompileSuccesses, 0);
   assert.equal(legacyLoaded.state.planetStripSuccesses, 0);
+  assert.equal(legacyLoaded.state.stellarSyncSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -361,6 +362,16 @@ try {
   assert.equal(planetReward, 9_000);
   assert.equal(planetState.planetStripSuccesses, 3);
   assert.equal(planetState.clips, 9_000);
+  const stellarMask = interior.randomStellarMask(() => 0);
+  assert.deepEqual(stellarMask, [false, true, true, false, false, false]);
+  assert.equal(stellarMask.filter(Boolean).length, 2);
+  assert.equal(interior.isStellarSyncSuccess(stellarMask, stellarMask), true);
+  assert.equal(interior.isStellarSyncSuccess([true, true, true, false, false, false], stellarMask), false);
+  const stellarState = createInitialState(0);
+  const stellarReward = interior.applyStellarSyncReward(stellarState, 3);
+  assert.equal(stellarReward, 10_500);
+  assert.equal(stellarState.stellarSyncSuccesses, 3);
+  assert.equal(stellarState.clips, 10_500);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 
