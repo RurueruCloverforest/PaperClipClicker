@@ -58,6 +58,8 @@ export interface GameState {
   dispatchReturnsAt: number;
   dispatchClaims: number;
   patchCount: number;
+  windReadyAt: number;
+  windCount: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -116,6 +118,8 @@ export function createInitialState(now = Date.now()): GameState {
     dispatchReturnsAt: 0,
     dispatchClaims: 0,
     patchCount: 0,
+    windReadyAt: 0,
+    windCount: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

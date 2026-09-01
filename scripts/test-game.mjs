@@ -22,6 +22,7 @@ try {
   const catalyst = await server.ssrLoadModule('/src/game/catalyst.ts');
   const dispatch = await server.ssrLoadModule('/src/game/dispatch.ts');
   const patch = await server.ssrLoadModule('/src/game/patch.ts');
+  const wind = await server.ssrLoadModule('/src/game/wind.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -310,6 +311,23 @@ try {
   revState.patchCount = 20;
   assert.equal(patch.buyPatch(revState, 0), false);
 
+  assert.equal(wind.windReward(0.2, 10), 0);
+  assert.equal(wind.windReward(0.4, 10), 20);
+  assert.equal(wind.windReward(3, 10), 150);
+  assert.equal(wind.windReward(9, 10), 150);
+  const windState = createInitialState(0);
+  windState.totalClips = 140;
+  assert.equal(wind.isWindUnlocked(windState), true);
+  const windNow = Date.now();
+  assert.equal(wind.releaseWind(windState, 0.2, 10, windNow), 0);
+  assert.equal(windState.windCount, 0);
+  const wound = wind.releaseWind(windState, 1, 10, windNow);
+  assert.equal(wound, 50);
+  assert.equal(windState.windCount, 1);
+  assert.equal(windState.clips, 50);
+  assert.equal(wind.releaseWind(windState, 3, 10, windNow), 0);
+  assert.equal(wind.releaseWind(windState, 3, 10, windNow + 8_000), 150);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -451,6 +469,8 @@ try {
   assert.equal(legacyLoaded.state.dispatchReturnsAt, 0);
   assert.equal(legacyLoaded.state.dispatchClaims, 0);
   assert.equal(legacyLoaded.state.patchCount, 0);
+  assert.equal(legacyLoaded.state.windReadyAt, 0);
+  assert.equal(legacyLoaded.state.windCount, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

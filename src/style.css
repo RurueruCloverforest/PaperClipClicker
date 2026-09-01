@@ -321,6 +321,24 @@ main { padding: 28px 0 12px; }
 .patch__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .patch .progress-track { height: 3px; margin-top: 10px; }
 .patch[data-max='true'] .patch__heading strong { color: var(--accent); }
+.wind { position: relative; z-index: 1; width: min(620px, 100%); margin: 12px auto 0; padding: 12px 17px; border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-strong) 82%, transparent); text-align: left; }
+.wind[hidden] { display: none; }
+.wind__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wind__identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wind__mark { flex: none; width: 12px; height: 16px; background: repeating-linear-gradient(180deg, var(--accent) 0 2px, transparent 2px 4px); }
+.wind[data-charge='true'] .wind__mark { transform: scaleY(1.2); transform-origin: center bottom; }
+@media (prefers-reduced-motion: reduce) {
+  .wind[data-charge='true'] .wind__mark { transform: none; }
+}
+.wind__heading small { color: var(--accent); font: 500 8px var(--font-mono); letter-spacing: .13em; }
+.wind__heading strong { display: block; margin-top: 3px; font: 600 12px var(--font-mono); }
+.wind__heading button { min-height: 44px; min-width: 88px; padding: 0 12px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; font: 700 11px var(--font-ui); touch-action: none; }
+.wind__heading button:not(:disabled):hover { color: var(--accent-ink); background: var(--accent); }
+.wind__heading button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.wind__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wind[data-charge='true'] .wind__heading button { color: var(--accent-ink); background: var(--accent); }
+.wind .progress-track { height: 3px; margin-top: 10px; }
+.wind[data-ready='true'] .wind__heading strong { color: var(--accent); }
 .bonus-event {
   position: absolute;
   z-index: 4;

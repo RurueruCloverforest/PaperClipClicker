@@ -23,6 +23,7 @@ import { pickGauge as chooseGauge } from './game/gauge';
 import { catalystMultiplier, tickCatalyst, toggleCatalyst as flipCatalyst } from './game/catalyst';
 import { chargeDispatch, collectDispatch as recoverDispatch, dispatchStatus, startDispatch as sendDispatch } from './game/dispatch';
 import { PATCH_BONUS, buyPatch as applyPatch } from './game/patch';
+import { WIND_MAX_SECONDS, isWindReady, releaseWind } from './game/wind';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -156,6 +157,8 @@ let causalCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 let clickCombo = 0;
 let lastClickAt = 0;
+let windHeld = false;
+let windStartedAt = 0;
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -635,6 +638,30 @@ const ui = new GameUi(app, {
     const message = `最適化改訂 ${state.patchCount}：設備 +${Math.round(state.patchCount * PATCH_BONUS * 100)}%`;
     ui.announce(message, 'success');
     ui.addLog('REV', message);
+    ui.render(state, true);
+    saveGame(state);
+  },
+  startWind: () => {
+    if (windHeld || !isWindReady(state)) return;
+    windHeld = true;
+    windStartedAt = performance.now();
+    ui.setWindCharge(0, true);
+    ui.render(state, true);
+  },
+  stopWind: () => {
+    if (!windHeld) return;
+    windHeld = false;
+    const charge = Math.min(WIND_MAX_SECONDS, (performance.now() - windStartedAt) / 1000);
+    ui.setWindCharge(0, false);
+    const reward = releaseWind(state, charge, productionPerSecond(state));
+    if (reward <= 0) {
+      ui.render(state, true);
+      return;
+    }
+    const message = `ばね巻上げ：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('WIND', message);
+    updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
   },
@@ -1226,7 +1253,10 @@ const ui = new GameUi(app, {
     causalCooldownUntil = 0;
     clickCombo = 0;
     lastClickAt = 0;
+    windHeld = false;
+    windStartedAt = 0;
     ui.setClickCombo(0, 1);
+    ui.setWindCharge(0, false);
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1271,7 +1301,10 @@ const ui = new GameUi(app, {
     causalCooldownUntil = 0;
     clickCombo = 0;
     lastClickAt = 0;
+    windHeld = false;
+    windStartedAt = 0;
     ui.setClickCombo(0, 1);
+    ui.setWindCharge(0, false);
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1602,6 +1635,7 @@ const loop = new GameLoop((elapsedSeconds) => {
     clickCombo = 0;
     ui.setClickCombo(0, 1);
   }
+  if (windHeld) ui.setWindCharge(Math.min(WIND_MAX_SECONDS, (performance.now() - windStartedAt) / 1000), true);
   ui.render(state);
 });
 loop.start();

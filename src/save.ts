@@ -104,6 +104,8 @@ function normalize(raw: unknown, now: number): GameState {
     dispatchReturnsAt: finite(raw.dispatchReturnsAt, 0),
     dispatchClaims: Math.floor(finite(raw.dispatchClaims, 0)),
     patchCount: Math.floor(finite(raw.patchCount, 0)),
+    windReadyAt: finite(raw.windReadyAt, 0),
+    windCount: Math.floor(finite(raw.windCount, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };
