@@ -2,6 +2,7 @@ import { createInitialState, MACHINE_IDS, UPGRADE_IDS, type DirectiveId, type Ga
 import { produceForDuration, productionPerSecond } from './game/clips';
 import { chargeCapacitor } from './game/capacitor';
 import { catalystMultiplier, tickCatalyst } from './game/catalyst';
+import { chargeDispatch } from './game/dispatch';
 import { PHASES } from './game/progression';
 import { markReachedPhaseRewardsGranted } from './game/observation';
 
@@ -99,6 +100,9 @@ function normalize(raw: unknown, now: number): GameState {
     gaugeHits: Math.floor(finite(raw.gaugeHits, 0)),
     catalystActive: raw.catalystActive === true,
     catalystSeconds: finite(raw.catalystSeconds, 0),
+    dispatchStored: finite(raw.dispatchStored, 0),
+    dispatchReturnsAt: finite(raw.dispatchReturnsAt, 0),
+    dispatchClaims: Math.floor(finite(raw.dispatchClaims, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };
@@ -139,6 +143,7 @@ export function loadGame(now = Date.now()): LoadResult {
     const offlineClips = produceForDuration(state, elapsed);
     chargeCapacitor(state, elapsed);
     tickCatalyst(state, elapsed, productionPerSecond(state) / catalystMultiplier(state));
+    chargeDispatch(state, elapsed, productionPerSecond(state), now);
     state.lastSavedAt = now;
     return { state, offlineSeconds: elapsed, offlineClips, recovered: false };
   } catch {

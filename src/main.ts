@@ -21,6 +21,7 @@ import { startOverclock as sendOverclock } from './game/overclock';
 import { startFold as sendFold } from './game/fold';
 import { pickGauge as chooseGauge } from './game/gauge';
 import { catalystMultiplier, tickCatalyst, toggleCatalyst as flipCatalyst } from './game/catalyst';
+import { chargeDispatch, collectDispatch as recoverDispatch, dispatchStatus, startDispatch as sendDispatch } from './game/dispatch';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -603,6 +604,28 @@ const ui = new GameUi(app, {
       ui.announce(message, 'success');
       ui.addLog('DRIP', message);
     }
+    ui.render(state, true);
+    saveGame(state);
+  },
+  dispatchAction: () => {
+    const now = Date.now();
+    const status = dispatchStatus(state, now);
+    if (status === 'filling') {
+      if (!sendDispatch(state, now)) return;
+      const message = `出荷便を出航：${Math.floor(state.dispatchStored).toLocaleString('ja-JP')}クリップ`;
+      ui.announce(message, 'success');
+      ui.addLog('SHIP', message);
+      ui.render(state, true);
+      saveGame(state);
+      return;
+    }
+    if (status !== 'ready') return;
+    const reward = recoverDispatch(state, now);
+    if (reward <= 0) return;
+    const message = `出荷便回収：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('LOT', message);
+    updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
   },
@@ -1314,6 +1337,7 @@ const loop = new GameLoop((elapsedSeconds) => {
   produceForDuration(state, elapsedSeconds);
   chargeCapacitor(state, elapsedSeconds);
   tickCatalyst(state, elapsedSeconds, productionPerSecond(state) / catalystMultiplier(state));
+  chargeDispatch(state, elapsedSeconds, productionPerSecond(state));
   state.playTimeSeconds += elapsedSeconds;
   autoBuyAccumulator += elapsedSeconds;
   while (autoBuyAccumulator >= 1) {

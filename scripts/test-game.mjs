@@ -20,6 +20,7 @@ try {
   const fold = await server.ssrLoadModule('/src/game/fold.ts');
   const gauge = await server.ssrLoadModule('/src/game/gauge.ts');
   const catalyst = await server.ssrLoadModule('/src/game/catalyst.ts');
+  const dispatch = await server.ssrLoadModule('/src/game/dispatch.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -263,6 +264,27 @@ try {
   assert.equal(catalyst.tickCatalyst(catState, 1, unboosted), 0);
   assert.equal(catState.catalystActive, false);
 
+  assert.equal(dispatch.dispatchCapacity(0), 40);
+  assert.equal(dispatch.dispatchCapacity(10), 150);
+  const shipState = createInitialState(0);
+  shipState.totalClips = 160;
+  assert.equal(dispatch.isDispatchUnlocked(shipState), true);
+  const shippedCharge = dispatch.chargeDispatch(shipState, 10, 10, 1_000);
+  assert.equal(shippedCharge, 20);
+  assert.equal(shipState.dispatchStored, 20);
+  assert.equal(dispatch.dispatchStatus(shipState, 1_000), 'filling');
+  assert.equal(dispatch.startDispatch(shipState, 1_000), true);
+  assert.equal(dispatch.dispatchStatus(shipState, 1_000), 'transit');
+  assert.equal(dispatch.chargeDispatch(shipState, 10, 10, 1_000), 0);
+  assert.equal(dispatch.collectDispatch(shipState, 1_000), 0);
+  assert.equal(dispatch.dispatchStatus(shipState, 11_000), 'ready');
+  const shipped = dispatch.collectDispatch(shipState, 11_000);
+  assert.equal(shipped, 32);
+  assert.equal(shipState.dispatchStored, 0);
+  assert.equal(shipState.dispatchClaims, 1);
+  assert.equal(shipState.clips, 32);
+  assert.equal(dispatch.dispatchStatus(shipState, 11_000), 'filling');
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -400,6 +422,9 @@ try {
   assert.equal(legacyLoaded.state.gaugeHits, 0);
   assert.equal(legacyLoaded.state.catalystActive, false);
   assert.equal(legacyLoaded.state.catalystSeconds, 0);
+  assert.equal(legacyLoaded.state.dispatchStored, 0);
+  assert.equal(legacyLoaded.state.dispatchReturnsAt, 0);
+  assert.equal(legacyLoaded.state.dispatchClaims, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
