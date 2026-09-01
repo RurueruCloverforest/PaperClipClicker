@@ -18,6 +18,7 @@ try {
   const capacitor = await server.ssrLoadModule('/src/game/capacitor.ts');
   const overclock = await server.ssrLoadModule('/src/game/overclock.ts');
   const fold = await server.ssrLoadModule('/src/game/fold.ts');
+  const gauge = await server.ssrLoadModule('/src/game/gauge.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -214,6 +215,27 @@ try {
   assert.equal(fold.startFold(foldState, 0, foldNow), 0);
   assert.equal(fold.canStartFold(foldState, 0, foldNow + 15_000), true);
 
+  assert.equal(gauge.gaugeReward(0), 20);
+  assert.equal(gauge.gaugeReward(10), 60);
+  assert.equal(gauge.nextGaugeTarget(0, () => 0), 1);
+  assert.equal(gauge.nextGaugeTarget(0, () => 0.9), 2);
+  const gaugeState = createInitialState(0);
+  gaugeState.totalClips = 150;
+  assert.equal(gauge.isGaugeUnlocked(gaugeState), true);
+  const gaugeNow = Date.now();
+  assert.equal(gauge.pickGauge(gaugeState, 1, 0, gaugeNow), 0);
+  assert.equal(gaugeState.gaugeHits, 0);
+  assert.equal(gauge.pickGauge(gaugeState, 0, 0, gaugeNow), 0);
+  const gauged = gauge.pickGauge(gaugeState, 0, 0, gaugeNow + 2_000, () => 0);
+  assert.equal(gauged, 20);
+  assert.equal(gaugeState.clips, 20);
+  assert.equal(gaugeState.totalClips, 170);
+  assert.equal(gaugeState.gaugeHits, 1);
+  assert.equal(gaugeState.gaugeTarget, 1);
+  assert.equal(gauge.pickGauge(gaugeState, 1, 0, gaugeNow + 2_000), 0);
+  assert.equal(gauge.pickGauge(gaugeState, 1, 0, gaugeNow + 2_000 + 8_000, () => 0.9), 20);
+  assert.equal(gaugeState.gaugeTarget, 2);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -346,6 +368,9 @@ try {
   assert.equal(legacyLoaded.state.overclockCount, 0);
   assert.equal(legacyLoaded.state.foldExpiresAt, 0);
   assert.equal(legacyLoaded.state.foldCount, 0);
+  assert.equal(legacyLoaded.state.gaugeTarget, 0);
+  assert.equal(legacyLoaded.state.gaugeReadyAt, 0);
+  assert.equal(legacyLoaded.state.gaugeHits, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

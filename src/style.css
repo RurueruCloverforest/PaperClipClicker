@@ -261,6 +261,22 @@ main { padding: 28px 0 12px; }
 .fold__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .fold .progress-track { height: 3px; margin-top: 10px; }
 .fold[data-ready='true'] .fold__heading strong { color: var(--accent); }
+.gauge { position: relative; z-index: 1; width: min(620px, 100%); margin: 12px auto 0; padding: 12px 17px; border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-strong) 82%, transparent); text-align: left; }
+.gauge[hidden] { display: none; }
+.gauge__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gauge__heading small { color: var(--accent); font: 500 8px var(--font-mono); letter-spacing: .13em; }
+.gauge__heading strong { display: block; margin-top: 3px; font: 600 12px var(--font-mono); }
+.gauge[data-ready='true'] .gauge__heading strong { color: var(--accent); }
+.gauge__gates { display: grid; grid-template-columns: repeat(3, minmax(64px, 1fr)); gap: 6px; flex: 1; min-width: 198px; }
+.gauge__gates button { display: grid; justify-items: center; align-content: center; gap: 5px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+.gauge__gates button span { font: 700 10px var(--font-ui); }
+.gauge__wire { display: block; width: 28px; background: currentColor; }
+.gauge__wire--thin { height: 1px; }
+.gauge__wire--mid { height: 3px; }
+.gauge__wire--thick { height: 6px; }
+.gauge__gates button:not(:disabled):hover { color: var(--accent-ink); background: var(--accent); }
+.gauge__gates button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.gauge__gates button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bonus-event {
   position: absolute;
   z-index: 4;

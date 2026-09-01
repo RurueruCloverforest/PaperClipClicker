@@ -93,6 +93,9 @@ function normalize(raw: unknown, now: number): GameState {
     overclockCount: Math.floor(finite(raw.overclockCount, 0)),
     foldExpiresAt: finite(raw.foldExpiresAt, 0),
     foldCount: Math.floor(finite(raw.foldCount, 0)),
+    gaugeTarget: raw.gaugeTarget === 1 || raw.gaugeTarget === 2 ? raw.gaugeTarget : 0,
+    gaugeReadyAt: finite(raw.gaugeReadyAt, 0),
+    gaugeHits: Math.floor(finite(raw.gaugeHits, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };

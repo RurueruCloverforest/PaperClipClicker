@@ -19,6 +19,7 @@ import { SURVEYS, collectSurvey as recoverSurvey, launchSurvey as sendSurvey } f
 import { chargeCapacitor, claimCapacitor as emptyCapacitor } from './game/capacitor';
 import { startOverclock as sendOverclock } from './game/overclock';
 import { startFold as sendFold } from './game/fold';
+import { pickGauge as chooseGauge } from './game/gauge';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -574,6 +575,20 @@ const ui = new GameUi(app, {
     const message = `折畳圧縮：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
     ui.announce(message, 'success');
     ui.addLog('FOLD', message);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  pickGauge: (id) => {
+    const reward = chooseGauge(state, id, productionPerSecond(state));
+    if (reward <= 0) {
+      ui.render(state, true);
+      saveGame(state);
+      return;
+    }
+    const message = `線径選別成功：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('GAUGE', message);
     updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
