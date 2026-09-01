@@ -12,6 +12,7 @@ import { REBOOT_PREVIEW_THRESHOLD, REBOOT_THRESHOLD, canReboot, rebootCoreGain, 
 import { SURVEYS, isSurveyUnlocked, surveyCost, surveyReward, surveyStatus } from '../game/survey';
 import { capacitorCapacity, isCapacitorUnlocked } from '../game/capacitor';
 import { canStartOverclock, isOverclockActive, isOverclockUnlocked, overclockCost } from '../game/overclock';
+import { FOLD_COOLDOWN_MS, canStartFold, foldCost, isFoldCooling, isFoldUnlocked } from '../game/fold';
 
 export interface UiActions {
   makeClip: (event: MouseEvent) => void;
@@ -48,6 +49,7 @@ export interface UiActions {
   collectSurvey: (id: SurveyId) => void;
   claimCapacitor: () => void;
   startOverclock: (id: MachineId) => void;
+  startFold: () => void;
   activateSignalBuff: (id: SignalBuffId) => void;
   claimDirective: (id: DirectiveId) => void;
   rebootProtocol: () => void;
@@ -178,6 +180,12 @@ export class GameUi {
   private readonly capacitorButton: HTMLButtonElement;
   private readonly capacitorClaimCount: HTMLElement;
   private readonly overclockCount: HTMLElement;
+  private readonly fold: HTMLElement;
+  private readonly foldStatus: HTMLElement;
+  private readonly foldPrice: HTMLElement;
+  private readonly foldProgress: HTMLElement;
+  private readonly foldButton: HTMLButtonElement;
+  private readonly foldCount: HTMLElement;
   private readonly reducedMotionQuery: MediaQueryList | null;
   private tickerPhaseId = '';
   private tickerIntervalId = 0;
@@ -193,7 +201,7 @@ export class GameUi {
     this.root.insertAdjacentHTML('beforeend', this.precisionTargetTemplate());
     this.root.insertAdjacentHTML('beforeend', this.interiorTemplate());
     required<HTMLElement>(root, '.hero').insertAdjacentHTML('beforeend', this.bonusEventTemplate());
-    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div><div><dt>探査帰還</dt><dd id="survey-recovered-count">0</dd></div><div><dt>最高連鎖</dt><dd id="max-click-combo">0</dd></div><div><dt>コンデンサ回収</dt><dd id="capacitor-claim-count">0</dd></div><div><dt>設備過負荷</dt><dd id="overclock-count">0</dd></div>');
+    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div><div><dt>探査帰還</dt><dd id="survey-recovered-count">0</dd></div><div><dt>最高連鎖</dt><dd id="max-click-combo">0</dd></div><div><dt>コンデンサ回収</dt><dd id="capacitor-claim-count">0</dd></div><div><dt>設備過負荷</dt><dd id="overclock-count">0</dd></div><div><dt>折畳圧縮</dt><dd id="fold-count">0</dd></div>');
     required<HTMLElement>(root, '.dashboard').insertAdjacentHTML('afterend', this.achievementPanelTemplate());
     required<HTMLElement>(root, '.achievement-panel').insertAdjacentHTML('afterend', this.signalLabTemplate());
     required<HTMLElement>(root, '#signal-lab').insertAdjacentHTML('afterend', this.directivePanelTemplate());
@@ -282,6 +290,12 @@ export class GameUi {
     this.capacitorButton = required(root, '#claim-capacitor');
     this.capacitorClaimCount = required(root, '#capacitor-claim-count');
     this.overclockCount = required(root, '#overclock-count');
+    this.fold = required(root, '#fold');
+    this.foldStatus = required(root, '#fold-status');
+    this.foldPrice = required(root, '#fold-price');
+    this.foldProgress = required(root, '#fold-progress');
+    this.foldButton = required(root, '#start-fold');
+    this.foldCount = required(root, '#fold-count');
     this.reducedMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.reducedMotionQuery?.addEventListener('change', () => this.refreshTicker(this.tickerPhaseId));
     this.bindEvents();
@@ -317,7 +331,9 @@ export class GameUi {
     this.maxClickComboCount.textContent = String(state.maxClickCombo);
     this.capacitorClaimCount.textContent = String(state.capacitorClaims);
     this.overclockCount.textContent = String(state.overclockCount);
+    this.foldCount.textContent = String(state.foldCount);
     this.renderCapacitor(state, format);
+    this.renderFold(state, format);
     this.themeSelect.value = state.settings.theme;
     this.compactToggle.checked = state.settings.compactNumbers;
     this.milestoneTotal.textContent = `${totalAchievedMilestones(state)} / ${TOTAL_MILESTONES}`;
@@ -1257,6 +1273,31 @@ export class GameUi {
     this.capacitorButton.setAttribute('aria-label', stored > 0 ? `余剰コンデンサから${format(stored)}クリップを回収` : '余剰コンデンサは空です');
   }
 
+  private renderFold(state: GameState, format: (value: number) => string): void {
+    const unlocked = isFoldUnlocked(state);
+    this.fold.hidden = !unlocked;
+    if (!unlocked) return;
+    const now = Date.now();
+    const cooling = isFoldCooling(state, now);
+    const rate = productionPerSecond(state);
+    const cost = foldCost(rate);
+    const remainMs = Math.max(0, state.foldExpiresAt - now);
+    const remainRatio = cooling ? remainMs / FOLD_COOLDOWN_MS : 1;
+    const status = cooling ? `COOL ${this.formatCountdown(remainMs / 1000)}` : 'READY';
+    this.fold.dataset.ready = cooling ? 'false' : 'true';
+    this.foldStatus.textContent = status;
+    this.foldPrice.textContent = `${format(cost)} clips`;
+    this.foldProgress.style.width = `${remainRatio * 100}%`;
+    this.foldProgress.closest('[role="progressbar"]')?.setAttribute('aria-valuenow', String(Math.floor(remainRatio * 100)));
+    const canStart = canStartFold(state, rate, now);
+    this.foldButton.disabled = !canStart;
+    this.foldButton.setAttribute('aria-label', cooling
+      ? `折畳圧縮、冷却残り${this.formatCountdown(remainMs / 1000)}`
+      : canStart
+        ? `${format(cost)}クリップで折畳圧縮する`
+        : '折畳圧縮の費用が足りません');
+  }
+
   private bindEvents(): void {
     this.makeButton.addEventListener('click', this.actions.makeClip);
     this.bonusEvent.addEventListener('click', this.actions.collectBonusEvent);
@@ -1274,6 +1315,7 @@ export class GameUi {
       button.addEventListener('click', () => this.actions.collectSurvey(button.dataset.collectSurvey as SurveyId));
     }
     this.capacitorButton.addEventListener('click', this.actions.claimCapacitor);
+    this.foldButton.addEventListener('click', this.actions.startFold);
     this.autoBulkOn.addEventListener('click', () => this.actions.setAllAutoBuy(true));
     this.autoBulkOff.addEventListener('click', () => this.actions.setAllAutoBuy(false));
     required<HTMLButtonElement>(this.root, '#open-settings').addEventListener('click', () => this.settingsDialog.showModal());
@@ -1366,7 +1408,7 @@ export class GameUi {
 
   private template(): string {
     const paperclip = ARTWORK.paperclipMain;
-    return `<div class="app-shell"><header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">⌁</span><span><strong>PAPERCLIP</strong><small>PROTOCOL / UNIT 01</small></span></div><div class="phase-chip"><span>PHASE</span><strong id="phase-name">手動プロトコル</strong></div><div class="status-chip"><span class="status-dot"></span> SYSTEM ONLINE</div><button id="open-settings" class="icon-button" type="button" aria-label="設定を開く">⚙</button></header><main id="top"><section class="hero panel"><div class="eyebrow">CURRENT INVENTORY</div><div id="clips-value" class="clip-value">0</div><div class="clip-unit">PAPERCLIPS</div><div class="rate"><span id="per-second">0 / 秒</span><span class="rate-pulse" aria-hidden="true"></span></div><button id="make-clip" class="make-button" type="button" aria-label="クリップを作る、1回につき1クリップ"><span class="make-button__orbit make-button__orbit--outer" aria-hidden="true"></span><span class="make-button__orbit make-button__orbit--inner" aria-hidden="true"></span><span class="make-button__impact" aria-hidden="true"></span><img class="clip-image" src="${escapeHtml(paperclip.src)}" alt="${paperclip.alt.decorative}" width="${paperclip.width}" height="${paperclip.height}" aria-hidden="true" /><span class="make-button__label"><small>MAKE PAPERCLIP</small><strong>クリップを作る</strong><span data-click-yield>+1 / CLICK</span><span id="click-combo" class="make-button__combo" hidden>CHAIN 1</span></span></button><p class="hero-note">目的関数：生産数を最大化する</p><figure class="observation"><div class="observation__heading"><small>OBSERVATION</small><strong id="observation-phase">手動プロトコル</strong></div><img id="observation-image" class="observation__image" src="${escapeHtml(ARTWORK.phaseManual.src)}" alt="${escapeHtml(ARTWORK.phaseManual.alt.standalone)}" width="${ARTWORK.phaseManual.width}" height="${ARTWORK.phaseManual.height}" /><p id="observation-note" class="observation__note">机上の端末が、最初の一本を待つ。</p><div class="observation__ticker" id="observation-ticker" aria-hidden="true"><span class="observation__ticker-label">WIRE</span><div class="observation__ticker-viewport"><div class="observation__ticker-track" id="observation-ticker-track"></div></div></div></figure><div class="next-goal"><div class="next-goal__heading"><span><small>NEXT FACILITY</small><strong id="goal-name">ワイヤー加工機</strong></span><span class="next-goal__numbers"><strong id="goal-percent">0%</strong><small id="goal-target">50 clips</small></span></div><div class="progress-track" role="progressbar" aria-label="次の設備解放までの進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal-progress"></span></div></div><div id="capacitor" class="capacitor" hidden><div class="capacitor__heading"><div><small>CAPACITOR</small><strong id="capacitor-value">0 / 50</strong></div><button id="claim-capacitor" type="button" disabled>回収</button></div><div class="progress-track" role="progressbar" aria-label="余剰コンデンサの充電" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="capacitor-progress"></span></div></div></section><div class="dashboard"><section class="panel shop-panel"><div class="section-heading section-heading--shop"><div><span class="eyebrow">AUTOMATION</span><h2>生産設備</h2></div><div class="purchase-mode" aria-label="購入数量"><button type="button" data-purchase-mode="1" aria-pressed="true">×1</button><button type="button" data-purchase-mode="10" aria-pressed="false">×10</button><button type="button" data-purchase-mode="max" aria-pressed="false">MAX</button></div><div id="auto-bulk-actions" class="auto-bulk-actions" hidden><button type="button" id="auto-bulk-on" aria-label="全設備の自動購入をONにする">すべて自動化</button><button type="button" id="auto-bulk-off" aria-label="全設備の自動購入をOFFにする">すべて解除</button></div></div><div id="machine-list" class="shop-list"></div></section><aside class="side-column"><section class="panel upgrade-panel"><div class="section-heading"><div><span class="eyebrow">OPTIMIZATION</span><h2>アップグレード</h2></div><span class="section-code">R&amp;D</span></div><p id="upgrade-empty" class="empty-state">生産を続けると、新しい最適化案が表示されます。</p><div id="upgrade-list" class="upgrade-list"></div></section><section class="panel stats-panel"><div class="section-heading"><div><span class="eyebrow">TELEMETRY</span><h2>統計</h2></div></div><dl class="stats"><div><dt>累計生産</dt><dd id="total-clips">0</dd></div><div><dt>クリック生産</dt><dd><span id="per-click">1</span> / 回</dd></div><div><dt>稼働時間</dt><dd id="play-time">0秒</dd></div></dl></section><section class="panel log-panel"><div class="section-heading"><div><span class="eyebrow">EVENT STREAM</span><h2>システムログ</h2></div><span class="section-code">LIVE</span></div><ol id="system-log" class="system-log"><li class="system-log__empty">イベント待機中...</li></ol></section></aside></div></main><footer><span>LOCAL OPERATION · NO NETWORK REQUIRED</span><span id="save-status">自動保存 有効</span></footer></div><div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div><dialog id="settings-dialog" class="settings-dialog"><form method="dialog" class="settings-card"><div class="section-heading"><div><span class="eyebrow">CONTROL PANEL</span><h2>設定</h2></div><button id="close-settings" class="icon-button" type="button" aria-label="設定を閉じる">×</button></div><label class="setting-row"><span><strong>テーマ</strong><small>表示環境を選択</small></span><select id="theme-select"><option value="system">端末設定</option><option value="light">ライト</option><option value="dark">ダーク</option></select></label><label class="setting-row"><span><strong>数値の短縮表記</strong><small>1,000を1Kと表示</small></span><input id="compact-toggle" type="checkbox" role="switch" /></label><div class="settings-actions"><button id="save-now" class="secondary-button" type="button">今すぐ保存</button><button id="reset-game" class="danger-button" type="button">セーブデータを初期化</button></div></form></dialog>`;
+    return `<div class="app-shell"><header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">⌁</span><span><strong>PAPERCLIP</strong><small>PROTOCOL / UNIT 01</small></span></div><div class="phase-chip"><span>PHASE</span><strong id="phase-name">手動プロトコル</strong></div><div class="status-chip"><span class="status-dot"></span> SYSTEM ONLINE</div><button id="open-settings" class="icon-button" type="button" aria-label="設定を開く">⚙</button></header><main id="top"><section class="hero panel"><div class="eyebrow">CURRENT INVENTORY</div><div id="clips-value" class="clip-value">0</div><div class="clip-unit">PAPERCLIPS</div><div class="rate"><span id="per-second">0 / 秒</span><span class="rate-pulse" aria-hidden="true"></span></div><button id="make-clip" class="make-button" type="button" aria-label="クリップを作る、1回につき1クリップ"><span class="make-button__orbit make-button__orbit--outer" aria-hidden="true"></span><span class="make-button__orbit make-button__orbit--inner" aria-hidden="true"></span><span class="make-button__impact" aria-hidden="true"></span><img class="clip-image" src="${escapeHtml(paperclip.src)}" alt="${paperclip.alt.decorative}" width="${paperclip.width}" height="${paperclip.height}" aria-hidden="true" /><span class="make-button__label"><small>MAKE PAPERCLIP</small><strong>クリップを作る</strong><span data-click-yield>+1 / CLICK</span><span id="click-combo" class="make-button__combo" hidden>CHAIN 1</span></span></button><p class="hero-note">目的関数：生産数を最大化する</p><figure class="observation"><div class="observation__heading"><small>OBSERVATION</small><strong id="observation-phase">手動プロトコル</strong></div><img id="observation-image" class="observation__image" src="${escapeHtml(ARTWORK.phaseManual.src)}" alt="${escapeHtml(ARTWORK.phaseManual.alt.standalone)}" width="${ARTWORK.phaseManual.width}" height="${ARTWORK.phaseManual.height}" /><p id="observation-note" class="observation__note">机上の端末が、最初の一本を待つ。</p><div class="observation__ticker" id="observation-ticker" aria-hidden="true"><span class="observation__ticker-label">WIRE</span><div class="observation__ticker-viewport"><div class="observation__ticker-track" id="observation-ticker-track"></div></div></div></figure><div class="next-goal"><div class="next-goal__heading"><span><small>NEXT FACILITY</small><strong id="goal-name">ワイヤー加工機</strong></span><span class="next-goal__numbers"><strong id="goal-percent">0%</strong><small id="goal-target">50 clips</small></span></div><div class="progress-track" role="progressbar" aria-label="次の設備解放までの進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal-progress"></span></div></div><div id="capacitor" class="capacitor" hidden><div class="capacitor__heading"><div><small>CAPACITOR</small><strong id="capacitor-value">0 / 50</strong></div><button id="claim-capacitor" type="button" disabled>回収</button></div><div class="progress-track" role="progressbar" aria-label="余剰コンデンサの充電" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="capacitor-progress"></span></div></div><div id="fold" class="fold" hidden><div class="fold__heading"><div class="fold__identity"><span class="fold__mark" aria-hidden="true"></span><div><small>CLIP FOLD</small><strong id="fold-status">READY</strong></div></div><button id="start-fold" type="button" disabled><span>圧縮</span><small id="fold-price">0 clips</small></button></div><div class="progress-track" role="progressbar" aria-label="折畳圧縮の冷却" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="fold-progress"></span></div></div></section><div class="dashboard"><section class="panel shop-panel"><div class="section-heading section-heading--shop"><div><span class="eyebrow">AUTOMATION</span><h2>生産設備</h2></div><div class="purchase-mode" aria-label="購入数量"><button type="button" data-purchase-mode="1" aria-pressed="true">×1</button><button type="button" data-purchase-mode="10" aria-pressed="false">×10</button><button type="button" data-purchase-mode="max" aria-pressed="false">MAX</button></div><div id="auto-bulk-actions" class="auto-bulk-actions" hidden><button type="button" id="auto-bulk-on" aria-label="全設備の自動購入をONにする">すべて自動化</button><button type="button" id="auto-bulk-off" aria-label="全設備の自動購入をOFFにする">すべて解除</button></div></div><div id="machine-list" class="shop-list"></div></section><aside class="side-column"><section class="panel upgrade-panel"><div class="section-heading"><div><span class="eyebrow">OPTIMIZATION</span><h2>アップグレード</h2></div><span class="section-code">R&amp;D</span></div><p id="upgrade-empty" class="empty-state">生産を続けると、新しい最適化案が表示されます。</p><div id="upgrade-list" class="upgrade-list"></div></section><section class="panel stats-panel"><div class="section-heading"><div><span class="eyebrow">TELEMETRY</span><h2>統計</h2></div></div><dl class="stats"><div><dt>累計生産</dt><dd id="total-clips">0</dd></div><div><dt>クリック生産</dt><dd><span id="per-click">1</span> / 回</dd></div><div><dt>稼働時間</dt><dd id="play-time">0秒</dd></div></dl></section><section class="panel log-panel"><div class="section-heading"><div><span class="eyebrow">EVENT STREAM</span><h2>システムログ</h2></div><span class="section-code">LIVE</span></div><ol id="system-log" class="system-log"><li class="system-log__empty">イベント待機中...</li></ol></section></aside></div></main><footer><span>LOCAL OPERATION · NO NETWORK REQUIRED</span><span id="save-status">自動保存 有効</span></footer></div><div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div><dialog id="settings-dialog" class="settings-dialog"><form method="dialog" class="settings-card"><div class="section-heading"><div><span class="eyebrow">CONTROL PANEL</span><h2>設定</h2></div><button id="close-settings" class="icon-button" type="button" aria-label="設定を閉じる">×</button></div><label class="setting-row"><span><strong>テーマ</strong><small>表示環境を選択</small></span><select id="theme-select"><option value="system">端末設定</option><option value="light">ライト</option><option value="dark">ダーク</option></select></label><label class="setting-row"><span><strong>数値の短縮表記</strong><small>1,000を1Kと表示</small></span><input id="compact-toggle" type="checkbox" role="switch" /></label><div class="settings-actions"><button id="save-now" class="secondary-button" type="button">今すぐ保存</button><button id="reset-game" class="danger-button" type="button">セーブデータを初期化</button></div></form></dialog>`;
   }
 
   private achievementPanelTemplate(): string {

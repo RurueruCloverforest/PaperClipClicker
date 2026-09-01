@@ -17,6 +17,7 @@ try {
   const survey = await server.ssrLoadModule('/src/game/survey.ts');
   const capacitor = await server.ssrLoadModule('/src/game/capacitor.ts');
   const overclock = await server.ssrLoadModule('/src/game/overclock.ts');
+  const fold = await server.ssrLoadModule('/src/game/fold.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -193,6 +194,26 @@ try {
   assert.equal(overclock.overclockMultiplier(ocState, 'autoClipper', ocNow + 20_000), 1);
   assert.equal(clips.clickProduction(ocState), 1);
 
+  assert.equal(fold.foldCost(0), 50);
+  assert.equal(fold.foldCost(10), 80);
+  assert.equal(fold.foldReward(0), 80);
+  assert.equal(fold.foldReward(10), 200);
+  const foldState = createInitialState(0);
+  foldState.totalClips = 200;
+  foldState.clips = 50;
+  assert.equal(fold.isFoldUnlocked(foldState), true);
+  const foldNow = Date.now();
+  assert.equal(fold.canStartFold(foldState, 0, foldNow), true);
+  const folded = fold.startFold(foldState, 0, foldNow);
+  assert.equal(folded, 80);
+  assert.equal(foldState.clips, 80);
+  assert.equal(foldState.totalClips, 280);
+  assert.equal(foldState.foldCount, 1);
+  assert.equal(foldState.foldExpiresAt, foldNow + 15_000);
+  assert.equal(fold.canStartFold(foldState, 0, foldNow), false);
+  assert.equal(fold.startFold(foldState, 0, foldNow), 0);
+  assert.equal(fold.canStartFold(foldState, 0, foldNow + 15_000), true);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -323,6 +344,8 @@ try {
   assert.equal(legacyLoaded.state.overclockMachine, null);
   assert.equal(legacyLoaded.state.overclockExpiresAt, 0);
   assert.equal(legacyLoaded.state.overclockCount, 0);
+  assert.equal(legacyLoaded.state.foldExpiresAt, 0);
+  assert.equal(legacyLoaded.state.foldCount, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

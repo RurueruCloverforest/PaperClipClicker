@@ -91,6 +91,8 @@ function normalize(raw: unknown, now: number): GameState {
     overclockMachine: typeof raw.overclockMachine === 'string' && MACHINE_IDS.includes(raw.overclockMachine as MachineId) ? raw.overclockMachine as MachineId : null,
     overclockExpiresAt: finite(raw.overclockExpiresAt, 0),
     overclockCount: Math.floor(finite(raw.overclockCount, 0)),
+    foldExpiresAt: finite(raw.foldExpiresAt, 0),
+    foldCount: Math.floor(finite(raw.foldCount, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };

@@ -18,6 +18,7 @@ import { createRebootedState, rebootCoreGain } from './game/reboot';
 import { SURVEYS, collectSurvey as recoverSurvey, launchSurvey as sendSurvey } from './game/survey';
 import { chargeCapacitor, claimCapacitor as emptyCapacitor } from './game/capacitor';
 import { startOverclock as sendOverclock } from './game/overclock';
+import { startFold as sendFold } from './game/fold';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -564,6 +565,16 @@ const ui = new GameUi(app, {
     const message = `${getMachine(id).name}を過負荷：20秒 ×3`;
     ui.announce(message, 'success');
     ui.addLog('OVER', message);
+    ui.render(state, true);
+    saveGame(state);
+  },
+  startFold: () => {
+    const reward = sendFold(state, productionPerSecond(state));
+    if (reward <= 0) return;
+    const message = `折畳圧縮：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('FOLD', message);
+    updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
   },

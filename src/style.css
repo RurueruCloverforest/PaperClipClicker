@@ -245,6 +245,22 @@ main { padding: 28px 0 12px; }
 .capacitor__heading button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
 .capacitor .progress-track { height: 4px; margin-top: 10px; }
 .capacitor[data-full='true'] .capacitor__heading strong { color: var(--accent); }
+.fold { position: relative; z-index: 1; width: min(620px, 100%); margin: 12px auto 0; padding: 12px 17px; border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-strong) 82%, transparent); text-align: left; }
+.fold[hidden] { display: none; }
+.fold__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fold__identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fold__mark { flex: none; width: 12px; height: 12px; border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(45deg); }
+.fold__heading small { color: var(--accent); font: 500 8px var(--font-mono); letter-spacing: .13em; }
+.fold__heading strong { display: block; margin-top: 3px; font: 600 12px var(--font-mono); }
+.fold__heading button { min-height: 44px; min-width: 88px; padding: 4px 12px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+.fold__heading button span, .fold__heading button small { display: block; }
+.fold__heading button span { font: 700 11px var(--font-ui); }
+.fold__heading button small { margin-top: 2px; font: 600 7px var(--font-mono); letter-spacing: .06em; color: inherit; }
+.fold__heading button:not(:disabled):hover { color: var(--accent-ink); background: var(--accent); }
+.fold__heading button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.fold__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fold .progress-track { height: 3px; margin-top: 10px; }
+.fold[data-ready='true'] .fold__heading strong { color: var(--accent); }
 .bonus-event {
   position: absolute;
   z-index: 4;
