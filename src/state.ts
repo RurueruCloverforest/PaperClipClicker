@@ -32,6 +32,7 @@ export interface GameState {
   traceAiSuccesses: number;
   nanoPurgeSuccesses: number;
   swarmSyncSuccesses: number;
+  orbitalBerthSuccesses: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -65,6 +66,7 @@ export function createInitialState(now = Date.now()): GameState {
     traceAiSuccesses: 0,
     nanoPurgeSuccesses: 0,
     swarmSyncSuccesses: 0,
+    orbitalBerthSuccesses: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

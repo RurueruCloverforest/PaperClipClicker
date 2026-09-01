@@ -77,6 +77,7 @@ function normalize(raw: unknown, now: number): GameState {
     traceAiSuccesses: Math.floor(finite(raw.traceAiSuccesses, 0)),
     nanoPurgeSuccesses: Math.floor(finite(raw.nanoPurgeSuccesses, 0)),
     swarmSyncSuccesses: Math.floor(finite(raw.swarmSyncSuccesses, 0)),
+    orbitalBerthSuccesses: Math.floor(finite(raw.orbitalBerthSuccesses, 0)),
     signalBuffExpiresAt: (() => {
       const stored = isRecord(raw.signalBuffExpiresAt) ? raw.signalBuffExpiresAt : {};
       const result = { ...initial.signalBuffExpiresAt };

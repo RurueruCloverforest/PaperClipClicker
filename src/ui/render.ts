@@ -32,6 +32,8 @@ export interface UiActions {
   purgeNanoCell: (index: number) => void;
   toggleSwarmUnit: (index: number) => void;
   lockSwarmFormation: () => void;
+  toggleOrbitalDock: (index: number) => void;
+  lockOrbitalBerth: () => void;
   activateSignalBuff: (id: SignalBuffId) => void;
   claimDirective: (id: DirectiveId) => void;
   rebootProtocol: () => void;
@@ -129,6 +131,7 @@ export class GameUi {
   private readonly traceConsole: HTMLElement;
   private readonly nanoConsole: HTMLElement;
   private readonly swarmConsole: HTMLElement;
+  private readonly orbitalConsole: HTMLElement;
   private readonly interiorStatus: HTMLElement;
   private readonly interiorHarvestCount: HTMLElement;
   private readonly wireCalibrationCount: HTMLElement;
@@ -136,6 +139,7 @@ export class GameUi {
   private readonly traceAiCount: HTMLElement;
   private readonly nanoPurgeCount: HTMLElement;
   private readonly swarmSyncCount: HTMLElement;
+  private readonly orbitalBerthCount: HTMLElement;
   private readonly reducedMotionQuery: MediaQueryList | null;
   private tickerPhaseId = '';
   private tickerIntervalId = 0;
@@ -151,7 +155,7 @@ export class GameUi {
     this.root.insertAdjacentHTML('beforeend', this.precisionTargetTemplate());
     this.root.insertAdjacentHTML('beforeend', this.interiorTemplate());
     required<HTMLElement>(root, '.hero').insertAdjacentHTML('beforeend', this.bonusEventTemplate());
-    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div>');
+    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div>');
     required<HTMLElement>(root, '.dashboard').insertAdjacentHTML('afterend', this.achievementPanelTemplate());
     required<HTMLElement>(root, '.achievement-panel').insertAdjacentHTML('afterend', this.signalLabTemplate());
     required<HTMLElement>(root, '#signal-lab').insertAdjacentHTML('afterend', this.directivePanelTemplate());
@@ -210,6 +214,7 @@ export class GameUi {
     this.traceConsole = required(root, '#trace-console');
     this.nanoConsole = required(root, '#nano-console');
     this.swarmConsole = required(root, '#swarm-console');
+    this.orbitalConsole = required(root, '#orbital-console');
     this.interiorStatus = required(root, '#interior-status');
     this.interiorHarvestCount = required(root, '#interior-harvest-count');
     this.wireCalibrationCount = required(root, '#wire-calibration-count');
@@ -217,6 +222,7 @@ export class GameUi {
     this.traceAiCount = required(root, '#trace-ai-count');
     this.nanoPurgeCount = required(root, '#nano-purge-count');
     this.swarmSyncCount = required(root, '#swarm-sync-count');
+    this.orbitalBerthCount = required(root, '#orbital-berth-count');
     this.reducedMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.reducedMotionQuery?.addEventListener('change', () => this.refreshTicker(this.tickerPhaseId));
     this.bindEvents();
@@ -242,6 +248,7 @@ export class GameUi {
     this.traceAiCount.textContent = String(state.traceAiSuccesses);
     this.nanoPurgeCount.textContent = String(state.nanoPurgeSuccesses);
     this.swarmSyncCount.textContent = String(state.swarmSyncSuccesses);
+    this.orbitalBerthCount.textContent = String(state.orbitalBerthSuccesses);
     this.themeSelect.value = state.settings.theme;
     this.compactToggle.checked = state.settings.compactNumbers;
     this.milestoneTotal.textContent = `${totalAchievedMilestones(state)} / ${TOTAL_MILESTONES}`;
@@ -445,6 +452,7 @@ export class GameUi {
     this.traceConsole.hidden = true;
     this.nanoConsole.hidden = true;
     this.swarmConsole.hidden = true;
+    this.orbitalConsole.hidden = true;
     if (id === 'autoClipper') {
       const scene = ARTWORK.interiorAutoClipper;
       this.interiorScene.hidden = false;
@@ -487,6 +495,13 @@ export class GameUi {
       this.interiorUnsynced.hidden = true;
       this.swarmConsole.hidden = false;
       this.interiorStatus.textContent = '群同期を開始';
+    } else if (id === 'orbitalFoundry') {
+      this.interiorScene.hidden = true;
+      this.interiorScene.removeAttribute('src');
+      this.interiorScene.alt = '';
+      this.interiorUnsynced.hidden = true;
+      this.orbitalConsole.hidden = false;
+      this.interiorStatus.textContent = '環状係留を開始';
     } else {
       this.interiorScene.hidden = true;
       this.interiorScene.removeAttribute('src');
@@ -641,6 +656,52 @@ export class GameUi {
       button.setAttribute('aria-label', `組立ユニット ${index + 1}、${isOn ? '選択中' : '非選択'}`);
     }
     required<HTMLButtonElement>(this.swarmConsole, '#swarm-lock').disabled = disabled;
+  }
+
+  setOrbitalBerth(round: number, successes: number, target: number, selected: boolean[], blocked: number[], results: boolean[], phase: 'play' | 'result' | 'cooldown', message: string, disabled = false): void {
+    const count = selected.filter(Boolean).length;
+    const blockedSet = new Set(blocked);
+    const phaseLabel = phase === 'play' ? 'RANGE' : phase === 'cooldown' ? 'STANDBY' : results.at(-1) ? 'DOCKED' : 'DRIFT';
+    this.orbitalConsole.dataset.phase = phase === 'result' ? (results.at(-1) ? 'docked' : 'drift') : phase;
+    required<HTMLElement>(this.orbitalConsole, '#orbital-round').textContent = `ORBIT ${Math.min(Math.max(round, 1), 4)} / 4`;
+    required<HTMLElement>(this.orbitalConsole, '#orbital-phase').textContent = phaseLabel;
+    required<HTMLElement>(this.orbitalConsole, '#orbital-successes').textContent = `DOCKED ${successes}`;
+    required<HTMLElement>(this.orbitalConsole, '#orbital-need').textContent = `NEED ${target} · SELECT ${count}`;
+    required<HTMLElement>(this.orbitalConsole, '#orbital-result').textContent = message || '連続するドックを選んで係留してください';
+    const slots = required<HTMLElement>(this.orbitalConsole, '#orbital-slots');
+    const slotCount = Math.max(target, count);
+    slots.replaceChildren(...Array.from({ length: slotCount }, (_, index) => {
+      const slot = document.createElement('span');
+      if (index >= target) {
+        slot.dataset.fill = 'over';
+        slot.textContent = '!';
+      } else if (index < count) {
+        slot.dataset.fill = 'on';
+        slot.textContent = '●';
+      } else {
+        slot.dataset.fill = 'off';
+        slot.textContent = '○';
+      }
+      return slot;
+    }));
+    [...this.orbitalConsole.querySelectorAll<HTMLElement>('[data-orbital-step]')].forEach((lamp, lampIndex) => {
+      const result = results[lampIndex];
+      lamp.textContent = result === undefined ? '○' : result ? '✓' : '×';
+      lamp.dataset.result = result === undefined ? 'pending' : result ? 'correct' : 'wrong';
+    });
+    for (const button of this.orbitalConsole.querySelectorAll<HTMLButtonElement>('[data-orbital-dock]')) {
+      const index = Number(button.dataset.orbitalDock);
+      const isBlocked = blockedSet.has(index);
+      const isOn = selected[index] === true;
+      const kind = isBlocked ? 'block' : phase === 'result' && isOn ? (results.at(-1) ? 'docked' : 'berth') : isOn ? 'berth' : 'open';
+      const stateLabel = isBlocked ? 'BLOCK' : kind === 'docked' ? 'DOCKED' : isOn ? 'BERTH' : 'OPEN';
+      button.dataset.kind = kind;
+      button.disabled = disabled || isBlocked;
+      required<HTMLElement>(button, '[data-orbital-state]').textContent = stateLabel;
+      button.setAttribute('aria-pressed', isOn && !isBlocked ? 'true' : 'false');
+      button.setAttribute('aria-label', `係留ドック ${index + 1}、${isBlocked ? '閉鎖' : isOn ? '選択中' : '開放'}`);
+    }
+    required<HTMLButtonElement>(this.orbitalConsole, '#orbital-lock').disabled = disabled;
   }
 
   interiorClipCount(): number {
@@ -878,6 +939,10 @@ export class GameUi {
       button.addEventListener('click', () => this.actions.toggleSwarmUnit(Number(button.dataset.swarmUnit)));
     }
     required<HTMLButtonElement>(this.root, '#swarm-lock').addEventListener('click', this.actions.lockSwarmFormation);
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-orbital-dock]')) {
+      button.addEventListener('click', () => this.actions.toggleOrbitalDock(Number(button.dataset.orbitalDock)));
+    }
+    required<HTMLButtonElement>(this.root, '#orbital-lock').addEventListener('click', this.actions.lockOrbitalBerth);
     this.interiorDialog.addEventListener('click', (event) => {
       if (event.target === this.interiorDialog) this.actions.closeInterior();
     });
@@ -950,7 +1015,8 @@ export class GameUi {
     const scene = ARTWORK.interiorAutoClipper;
     const nanoCells = Array.from({ length: 16 }, (_, index) => `<button type="button" data-nano-cell="${index}" data-kind="lattice" aria-label="格子 ${index + 1}、正常格子"><span class="nano-cell__shape" aria-hidden="true"></span><small data-nano-label>OK</small></button>`).join('');
     const swarmUnits = Array.from({ length: 8 }, (_, index) => `<button type="button" data-swarm-unit="${index}" data-active="false" aria-pressed="false" aria-label="組立ユニット ${index + 1}、非選択"><span class="swarm-unit__mark" aria-hidden="true"></span><strong>U${String(index + 1).padStart(2, '0')}</strong><small data-swarm-state>IDLE</small></button>`).join('');
-    return `<dialog id="interior-dialog" class="interior-dialog"><div class="interior-card"><div class="interior-card__heading"><div><small>INTERIOR</small><strong id="interior-title">オートクリッパー</strong></div><button id="close-interior" class="icon-button" type="button" aria-label="内部を閉じる">×</button></div><div id="interior-stage" class="interior-stage"><img id="interior-scene" class="interior-stage__scene" src="${escapeHtml(scene.src)}" alt="${escapeHtml(scene.alt.standalone)}" width="${scene.width}" height="${scene.height}" hidden /><section id="wire-console" class="wire-console" hidden aria-label="ワイヤー張力校正盤"><div class="wire-console__head"><span id="wire-round">CALIBRATION 1 / 5</span><strong id="wire-successes">LOCKED 0</strong></div><div class="wire-gauge"><span class="wire-gauge__line" aria-hidden="true"></span><span id="wire-target" class="wire-gauge__target"><small>TARGET</small></span><span id="wire-needle" class="wire-gauge__needle" aria-hidden="true"></span></div><p id="wire-result" class="wire-console__result" aria-live="polite">針を適正帯で固定してください</p><button id="wire-lock" type="button"><strong>張力を固定</strong><small>LOCK TENSION</small></button></section><section id="factory-console" class="factory-console" hidden aria-label="クリップ工場品質ゲート"><div class="factory-console__head"><span id="factory-count">INSPECTION 1 / 8</span><strong id="factory-score">ACCURATE 0</strong></div><div class="factory-steps" aria-label="検査結果">${Array.from({ length: 8 }, (_, index) => `<span data-factory-step="${index}" data-result="pending">○</span>`).join('')}</div><article id="factory-product" class="factory-product" data-quality="standard"><small>OPTICAL REPORT</small><div class="factory-product__clip" aria-hidden="true"><span></span></div><strong id="factory-quality">STANDARD</strong><span id="factory-defect">✓ SPEC OK</span></article><p id="factory-result" class="factory-console__result" aria-live="polite">検査票を読み、搬送先を選択してください</p><div class="factory-gates"><button type="button" data-factory-choice="deformed"><strong>↻ 再資源化</strong><small>RECYCLE</small></button><button type="button" data-factory-choice="standard"><strong>→ 出荷</strong><small>SHIP</small></button></div></section><section id="trace-console" class="trace-console" hidden aria-label="AI改善トレース盤"><div class="trace-console__head"><span id="trace-round">TRACE 1 / 4</span><strong id="trace-phase">OBSERVE</strong><strong id="trace-successes">SYNC 0</strong></div><div class="trace-steps" aria-label="トレース結果"><span data-trace-step-lamp="0" data-result="pending">○</span><span data-trace-step-lamp="1" data-result="pending">○</span><span data-trace-step-lamp="2" data-result="pending">○</span><span data-trace-step-lamp="3" data-result="pending">○</span></div><div id="trace-pattern" class="trace-pattern" aria-hidden="true"></div><div class="trace-board"><span class="trace-board__lines" aria-hidden="true"></span><button type="button" data-trace-node="0" aria-label="工程 IN 取込"><small>IN</small><strong>取込</strong><span data-trace-step></span></button><button type="button" data-trace-node="1" aria-label="工程 SORT 選別"><small>SORT</small><strong>選別</strong><span data-trace-step></span></button><button type="button" data-trace-node="2" aria-label="工程 BEND 折曲"><small>BEND</small><strong>折曲</strong><span data-trace-step></span></button><button type="button" data-trace-node="3" aria-label="工程 OUT 搬出"><small>OUT</small><strong>搬出</strong><span data-trace-step></span></button></div><p id="trace-result" class="trace-console__result" aria-live="polite">工程順を観測してください</p></section><section id="nano-console" class="nano-console" hidden aria-label="ナノフォージ不純物除去盤"><div class="nano-console__head"><span id="nano-round">SWEEP 1 / 4</span><strong id="nano-phase">SCAN</strong><strong id="nano-successes">CLEAN 0</strong></div><div class="nano-steps" aria-label="掃引結果"><span data-nano-step="0" data-result="pending">○</span><span data-nano-step="1" data-result="pending">○</span><span data-nano-step="2" data-result="pending">○</span><span data-nano-step="3" data-result="pending">○</span></div><p id="nano-remaining" class="nano-remaining">WASTE 5 / 5</p><div class="nano-grid">${nanoCells}</div><p id="nano-result" class="nano-console__result" aria-live="polite">不純物だけを除去してください</p></section><section id="swarm-console" class="swarm-console" hidden aria-label="スウォーム群同期盤"><div class="swarm-console__head"><span id="swarm-round">SWARM 1 / 4</span><strong id="swarm-phase">FORM</strong><strong id="swarm-successes">LOCKED 0</strong></div><div class="swarm-steps" aria-label="同期結果"><span data-swarm-step="0" data-result="pending">○</span><span data-swarm-step="1" data-result="pending">○</span><span data-swarm-step="2" data-result="pending">○</span><span data-swarm-step="3" data-result="pending">○</span></div><p id="swarm-need" class="swarm-need">NEED 3 · SELECT 0</p><div id="swarm-slots" class="swarm-slots" aria-hidden="true"></div><div class="swarm-units">${swarmUnits}</div><p id="swarm-result" class="swarm-console__result" aria-live="polite">必要台数を選んで同期してください</p><button id="swarm-lock" type="button"><strong>同期</strong><small>LOCK FORMATION</small></button></section><p id="interior-unsynced" class="interior-unsynced" hidden>この工程の内部プロトコルは未同期</p></div><p id="interior-status" class="interior-status">内部を観測中</p></div></dialog>`;
+    const orbitalDocks = Array.from({ length: 8 }, (_, index) => `<button type="button" data-orbital-dock="${index}" data-kind="open" aria-pressed="false" aria-label="係留ドック ${index + 1}、開放"><span class="orbital-dock__mark" aria-hidden="true"></span><strong>D${String(index + 1).padStart(2, '0')}</strong><small data-orbital-state>OPEN</small></button>`).join('');
+    return `<dialog id="interior-dialog" class="interior-dialog"><div class="interior-card"><div class="interior-card__heading"><div><small>INTERIOR</small><strong id="interior-title">オートクリッパー</strong></div><button id="close-interior" class="icon-button" type="button" aria-label="内部を閉じる">×</button></div><div id="interior-stage" class="interior-stage"><img id="interior-scene" class="interior-stage__scene" src="${escapeHtml(scene.src)}" alt="${escapeHtml(scene.alt.standalone)}" width="${scene.width}" height="${scene.height}" hidden /><section id="wire-console" class="wire-console" hidden aria-label="ワイヤー張力校正盤"><div class="wire-console__head"><span id="wire-round">CALIBRATION 1 / 5</span><strong id="wire-successes">LOCKED 0</strong></div><div class="wire-gauge"><span class="wire-gauge__line" aria-hidden="true"></span><span id="wire-target" class="wire-gauge__target"><small>TARGET</small></span><span id="wire-needle" class="wire-gauge__needle" aria-hidden="true"></span></div><p id="wire-result" class="wire-console__result" aria-live="polite">針を適正帯で固定してください</p><button id="wire-lock" type="button"><strong>張力を固定</strong><small>LOCK TENSION</small></button></section><section id="factory-console" class="factory-console" hidden aria-label="クリップ工場品質ゲート"><div class="factory-console__head"><span id="factory-count">INSPECTION 1 / 8</span><strong id="factory-score">ACCURATE 0</strong></div><div class="factory-steps" aria-label="検査結果">${Array.from({ length: 8 }, (_, index) => `<span data-factory-step="${index}" data-result="pending">○</span>`).join('')}</div><article id="factory-product" class="factory-product" data-quality="standard"><small>OPTICAL REPORT</small><div class="factory-product__clip" aria-hidden="true"><span></span></div><strong id="factory-quality">STANDARD</strong><span id="factory-defect">✓ SPEC OK</span></article><p id="factory-result" class="factory-console__result" aria-live="polite">検査票を読み、搬送先を選択してください</p><div class="factory-gates"><button type="button" data-factory-choice="deformed"><strong>↻ 再資源化</strong><small>RECYCLE</small></button><button type="button" data-factory-choice="standard"><strong>→ 出荷</strong><small>SHIP</small></button></div></section><section id="trace-console" class="trace-console" hidden aria-label="AI改善トレース盤"><div class="trace-console__head"><span id="trace-round">TRACE 1 / 4</span><strong id="trace-phase">OBSERVE</strong><strong id="trace-successes">SYNC 0</strong></div><div class="trace-steps" aria-label="トレース結果"><span data-trace-step-lamp="0" data-result="pending">○</span><span data-trace-step-lamp="1" data-result="pending">○</span><span data-trace-step-lamp="2" data-result="pending">○</span><span data-trace-step-lamp="3" data-result="pending">○</span></div><div id="trace-pattern" class="trace-pattern" aria-hidden="true"></div><div class="trace-board"><span class="trace-board__lines" aria-hidden="true"></span><button type="button" data-trace-node="0" aria-label="工程 IN 取込"><small>IN</small><strong>取込</strong><span data-trace-step></span></button><button type="button" data-trace-node="1" aria-label="工程 SORT 選別"><small>SORT</small><strong>選別</strong><span data-trace-step></span></button><button type="button" data-trace-node="2" aria-label="工程 BEND 折曲"><small>BEND</small><strong>折曲</strong><span data-trace-step></span></button><button type="button" data-trace-node="3" aria-label="工程 OUT 搬出"><small>OUT</small><strong>搬出</strong><span data-trace-step></span></button></div><p id="trace-result" class="trace-console__result" aria-live="polite">工程順を観測してください</p></section><section id="nano-console" class="nano-console" hidden aria-label="ナノフォージ不純物除去盤"><div class="nano-console__head"><span id="nano-round">SWEEP 1 / 4</span><strong id="nano-phase">SCAN</strong><strong id="nano-successes">CLEAN 0</strong></div><div class="nano-steps" aria-label="掃引結果"><span data-nano-step="0" data-result="pending">○</span><span data-nano-step="1" data-result="pending">○</span><span data-nano-step="2" data-result="pending">○</span><span data-nano-step="3" data-result="pending">○</span></div><p id="nano-remaining" class="nano-remaining">WASTE 5 / 5</p><div class="nano-grid">${nanoCells}</div><p id="nano-result" class="nano-console__result" aria-live="polite">不純物だけを除去してください</p></section><section id="swarm-console" class="swarm-console" hidden aria-label="スウォーム群同期盤"><div class="swarm-console__head"><span id="swarm-round">SWARM 1 / 4</span><strong id="swarm-phase">FORM</strong><strong id="swarm-successes">LOCKED 0</strong></div><div class="swarm-steps" aria-label="同期結果"><span data-swarm-step="0" data-result="pending">○</span><span data-swarm-step="1" data-result="pending">○</span><span data-swarm-step="2" data-result="pending">○</span><span data-swarm-step="3" data-result="pending">○</span></div><p id="swarm-need" class="swarm-need">NEED 3 · SELECT 0</p><div id="swarm-slots" class="swarm-slots" aria-hidden="true"></div><div class="swarm-units">${swarmUnits}</div><p id="swarm-result" class="swarm-console__result" aria-live="polite">必要台数を選んで同期してください</p><button id="swarm-lock" type="button"><strong>同期</strong><small>LOCK FORMATION</small></button></section><section id="orbital-console" class="orbital-console" hidden aria-label="軌道工廠環状係留盤"><div class="orbital-console__head"><span id="orbital-round">ORBIT 1 / 4</span><strong id="orbital-phase">RANGE</strong><strong id="orbital-successes">DOCKED 0</strong></div><div class="orbital-steps" aria-label="係留結果"><span data-orbital-step="0" data-result="pending">○</span><span data-orbital-step="1" data-result="pending">○</span><span data-orbital-step="2" data-result="pending">○</span><span data-orbital-step="3" data-result="pending">○</span></div><p id="orbital-need" class="orbital-need">NEED 3 · SELECT 0</p><div id="orbital-slots" class="orbital-slots" aria-hidden="true"></div><div class="orbital-ring"><span class="orbital-ring__orbit" aria-hidden="true"></span><span class="orbital-ring__planet" aria-hidden="true"><small>EARTH</small></span>${orbitalDocks}</div><p id="orbital-result" class="orbital-console__result" aria-live="polite">連続するドックを選んで係留してください</p><button id="orbital-lock" type="button"><strong>係留</strong><small>LOCK BERTH</small></button></section><p id="interior-unsynced" class="interior-unsynced" hidden>この工程の内部プロトコルは未同期</p></div><p id="interior-status" class="interior-status">内部を観測中</p></div></dialog>`;
   }
 }
 

@@ -185,3 +185,72 @@ export function applySwarmSyncReward(state: GameState, successes: number): numbe
   state.swarmSyncSuccesses += safeSuccesses;
   return amount;
 }
+
+export const ORBITAL_INTERIOR: MachineId = 'orbitalFoundry';
+export const ORBITAL_ROUNDS = 4;
+export const ORBITAL_DOCKS = 8;
+export const ORBITAL_BLOCKED = 2;
+export const ORBITAL_TARGETS = [3, 4, 3, 4] as const;
+export const ORBITAL_COOLDOWN_MS = 55_000;
+export const ORBITAL_RESULT_MS = 700;
+
+export function orbitalTarget(round: number): number {
+  return ORBITAL_TARGETS[Math.min(Math.max(Math.floor(round), 1), ORBITAL_ROUNDS) - 1] ?? ORBITAL_TARGETS[0];
+}
+
+export function longestAvailableRun(blocked: number[], docks = ORBITAL_DOCKS): number {
+  const closed = new Set(blocked);
+  if (closed.size === 0) return docks;
+  let best = 0;
+  let current = 0;
+  for (let index = 0; index < docks * 2; index += 1) {
+    if (closed.has(index % docks)) current = 0;
+    else {
+      current += 1;
+      best = Math.max(best, current);
+    }
+  }
+  return Math.min(best, docks);
+}
+
+export function randomOrbitalBlocked(target: number, random = Math.random): number[] {
+  const safeTarget = Math.max(1, Math.min(ORBITAL_DOCKS - ORBITAL_BLOCKED, Math.floor(target)));
+  for (let attempt = 0; attempt < 48; attempt += 1) {
+    const first = Math.floor(Math.max(0, Math.min(0.999999, random())) * ORBITAL_DOCKS);
+    let second = Math.floor(Math.max(0, Math.min(0.999999, random())) * ORBITAL_DOCKS);
+    if (second === first) second = (first + 1 + Math.floor(Math.max(0, Math.min(0.999999, random())) * (ORBITAL_DOCKS - 1))) % ORBITAL_DOCKS;
+    const blocked = [first, second].sort((left, right) => left - right);
+    if (new Set(blocked).size === ORBITAL_BLOCKED && longestAvailableRun(blocked) >= safeTarget) return blocked;
+  }
+  return [0, 1];
+}
+
+export function isContiguousArc(selected: boolean[], docks = ORBITAL_DOCKS): boolean {
+  const indices = selected.flatMap((on, index) => (on ? [index] : []));
+  if (indices.length <= 1) return indices.length === 1;
+  if (indices.length === docks) return true;
+  const gaps: number[] = [];
+  for (let index = 0; index < indices.length - 1; index += 1) gaps.push(indices[index + 1]! - indices[index]!);
+  gaps.push(indices[0]! + docks - indices[indices.length - 1]!);
+  const ones = gaps.filter((gap) => gap === 1).length;
+  return ones === indices.length - 1 && gaps.includes(docks - indices.length + 1);
+}
+
+export function isOrbitalBerthSuccess(selected: boolean[], blocked: number[], target: number): boolean {
+  if (selected.filter(Boolean).length !== target) return false;
+  if (blocked.some((index) => selected[index])) return false;
+  return isContiguousArc(selected);
+}
+
+export function orbitalBerthUnitReward(state: GameState): number {
+  return Math.max(2_000, productionPerSecond(state) * 95, clickProduction(state) * 220);
+}
+
+export function applyOrbitalBerthReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(ORBITAL_ROUNDS, Math.floor(successes)));
+  const amount = orbitalBerthUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.orbitalBerthSuccesses += safeSuccesses;
+  return amount;
+}

@@ -243,6 +243,7 @@ try {
   assert.equal(legacyLoaded.state.traceAiSuccesses, 0);
   assert.equal(legacyLoaded.state.nanoPurgeSuccesses, 0);
   assert.equal(legacyLoaded.state.swarmSyncSuccesses, 0);
+  assert.equal(legacyLoaded.state.orbitalBerthSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -318,6 +319,23 @@ try {
   assert.equal(swarmReward, 4_500);
   assert.equal(swarmState.swarmSyncSuccesses, 3);
   assert.equal(swarmState.clips, 4_500);
+  assert.equal(interior.orbitalTarget(1), 3);
+  assert.equal(interior.orbitalTarget(2), 4);
+  assert.equal(interior.orbitalTarget(3), 3);
+  assert.equal(interior.orbitalTarget(4), 4);
+  assert.deepEqual(interior.randomOrbitalBlocked(3, () => 0), [0, 1]);
+  assert.equal(interior.longestAvailableRun([0, 1]), 6);
+  assert.equal(interior.isContiguousArc([true, true, true, false, false, false, false, false]), true);
+  assert.equal(interior.isContiguousArc([true, false, false, false, false, false, false, true]), true);
+  assert.equal(interior.isContiguousArc([true, false, true, false, false, false, false, false]), false);
+  assert.equal(interior.isOrbitalBerthSuccess([true, true, true, false, false, false, false, false], [4, 5], 3), true);
+  assert.equal(interior.isOrbitalBerthSuccess([true, true, false, true, false, false, false, false], [4, 5], 3), false);
+  assert.equal(interior.isOrbitalBerthSuccess([true, true, true, false, false, false, false, false], [2, 5], 3), false);
+  const orbitalState = createInitialState(0);
+  const orbitalReward = interior.applyOrbitalBerthReward(orbitalState, 3);
+  assert.equal(orbitalReward, 6_000);
+  assert.equal(orbitalState.orbitalBerthSuccesses, 3);
+  assert.equal(orbitalState.clips, 6_000);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 
