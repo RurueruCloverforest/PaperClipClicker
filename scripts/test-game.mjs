@@ -25,6 +25,7 @@ try {
   const wind = await server.ssrLoadModule('/src/game/wind.ts');
   const pulse = await server.ssrLoadModule('/src/game/pulse.ts');
   const scrap = await server.ssrLoadModule('/src/game/scrap.ts');
+  const trim = await server.ssrLoadModule('/src/game/trim.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -364,6 +365,28 @@ try {
   assert.equal(clips.buyMachines(buyScrap, 'autoClipper', 1), 1);
   assert.ok(Math.abs(buyScrap.scrapStored - 1.2) < 1e-9);
 
+  assert.equal(trim.trimCost(createInitialState(0), 0), 20);
+  assert.equal(trim.trimCost(createInitialState(0), 10), 30);
+  const trimPriced = createInitialState(0);
+  trimPriced.trimCount = 1;
+  assert.equal(trim.trimCost(trimPriced, 10), 41);
+  assert.equal(trim.trimMultiplier(createInitialState(0)), 1);
+  trimPriced.trimCount = 5;
+  assert.equal(trim.trimMultiplier(trimPriced), 0.85);
+  trimPriced.trimCount = 15;
+  assert.equal(trim.trimMultiplier(trimPriced), 0.55);
+  assert.equal(trim.isTrimMaxed(trimPriced), true);
+  const trimState = createInitialState(0);
+  trimState.totalClips = 90;
+  trimState.clips = 20;
+  assert.equal(trim.isTrimUnlocked(trimState), true);
+  assert.equal(trim.buyTrim(trimState, 0), true);
+  assert.equal(trimState.trimCount, 1);
+  assert.equal(trimState.clips, 0);
+  trimState.trimCount = 15;
+  assert.equal(clips.machinePrice(trimState, 'autoClipper'), 9);
+  assert.equal(trim.buyTrim(trimState, 0), false);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -511,6 +534,7 @@ try {
   assert.equal(legacyLoaded.state.pulseCount, 0);
   assert.equal(legacyLoaded.state.scrapStored, 0);
   assert.equal(legacyLoaded.state.scrapClaims, 0);
+  assert.equal(legacyLoaded.state.trimCount, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

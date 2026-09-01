@@ -9,10 +9,11 @@ import { overclockMultiplier } from './overclock';
 import { catalystMultiplier } from './catalyst';
 import { patchMultiplier } from './patch';
 import { chargeScrap } from './scrap';
+import { trimMultiplier } from './trim';
 
 export function machinePrice(state: GameState, id: MachineId): number {
   const machine = getMachine(id);
-  return Math.ceil(machine.basePrice * 1.15 ** state.machines[id]);
+  return Math.ceil(machine.basePrice * 1.15 ** state.machines[id] * trimMultiplier(state));
 }
 
 export function clickProduction(state: GameState): number {
@@ -72,7 +73,7 @@ export function machineBatchPrice(state: GameState, id: MachineId, count: number
   const machine = getMachine(id);
   let total = 0;
   for (let offset = 0; offset < count; offset += 1) {
-    total += Math.ceil(machine.basePrice * 1.15 ** (state.machines[id] + offset));
+    total += Math.ceil(machine.basePrice * 1.15 ** (state.machines[id] + offset) * trimMultiplier(state));
   }
   return total;
 }

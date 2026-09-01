@@ -26,6 +26,7 @@ import { PATCH_BONUS, buyPatch as applyPatch } from './game/patch';
 import { WIND_MAX_SECONDS, isWindReady, releaseWind } from './game/wind';
 import { claimPulse as takePulse } from './game/pulse';
 import { claimScrap as emptyScrap } from './game/scrap';
+import { TRIM_BONUS, buyTrim as applyTrim } from './game/trim';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -684,6 +685,14 @@ const ui = new GameUi(app, {
     ui.announce(message, 'success');
     ui.addLog('SCRAP', message);
     updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  buyTrim: () => {
+    if (!applyTrim(state, productionPerSecond(state))) return;
+    const message = `調達削り ${state.trimCount}：設備価格 -${Math.round(state.trimCount * TRIM_BONUS * 100)}%`;
+    ui.announce(message, 'success');
+    ui.addLog('TRIM', message);
     ui.render(state, true);
     saveGame(state);
   },

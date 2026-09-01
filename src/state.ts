@@ -64,6 +64,7 @@ export interface GameState {
   pulseCount: number;
   scrapStored: number;
   scrapClaims: number;
+  trimCount: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -128,6 +129,7 @@ export function createInitialState(now = Date.now()): GameState {
     pulseCount: 0,
     scrapStored: 0,
     scrapClaims: 0,
+    trimCount: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

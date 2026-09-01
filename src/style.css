@@ -371,6 +371,22 @@ main { padding: 28px 0 12px; }
 .scrap__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .scrap .progress-track { height: 3px; margin-top: 10px; }
 .scrap[data-full='true'] .scrap__heading strong { color: var(--accent); }
+.trim { position: relative; z-index: 1; width: min(620px, 100%); margin: 12px auto 0; padding: 12px 17px; border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-strong) 82%, transparent); text-align: left; }
+.trim[hidden] { display: none; }
+.trim__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.trim__identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.trim__mark { flex: none; width: 12px; height: 16px; border: 2px solid var(--accent); border-radius: 1px 1px 2px 2px; background: radial-gradient(circle at 50% 22%, var(--bg) 2px, var(--accent) 2.5px 3.5px, transparent 4px); }
+.trim__heading small { color: var(--accent); font: 500 8px var(--font-mono); letter-spacing: .13em; }
+.trim__heading strong { display: block; margin-top: 3px; font: 600 12px var(--font-mono); }
+.trim__heading button { min-height: 44px; min-width: 88px; padding: 4px 12px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; }
+.trim__heading button span, .trim__heading button small { display: block; }
+.trim__heading button span { font: 700 11px var(--font-ui); }
+.trim__heading button small { margin-top: 2px; font: 600 7px var(--font-mono); letter-spacing: .06em; color: inherit; }
+.trim__heading button:not(:disabled):hover { color: var(--accent-ink); background: var(--accent); }
+.trim__heading button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.trim__heading button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.trim .progress-track { height: 3px; margin-top: 10px; }
+.trim[data-max='true'] .trim__heading strong { color: var(--accent); }
 .bonus-event {
   position: absolute;
   z-index: 4;
