@@ -24,6 +24,7 @@ import { catalystMultiplier, tickCatalyst, toggleCatalyst as flipCatalyst } from
 import { chargeDispatch, collectDispatch as recoverDispatch, dispatchStatus, startDispatch as sendDispatch } from './game/dispatch';
 import { PATCH_BONUS, buyPatch as applyPatch } from './game/patch';
 import { WIND_MAX_SECONDS, isWindReady, releaseWind } from './game/wind';
+import { claimPulse as takePulse } from './game/pulse';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -661,6 +662,16 @@ const ui = new GameUi(app, {
     const message = `ばね巻上げ：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
     ui.announce(message, 'success');
     ui.addLog('WIND', message);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  claimPulse: () => {
+    const reward = takePulse(state, productionPerSecond(state));
+    if (reward <= 0) return;
+    const message = `同期パルス：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('PING', message);
     updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
