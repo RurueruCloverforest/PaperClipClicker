@@ -52,6 +52,8 @@ export interface GameState {
   gaugeTarget: 0 | 1 | 2;
   gaugeReadyAt: number;
   gaugeHits: number;
+  catalystActive: boolean;
+  catalystSeconds: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -104,6 +106,8 @@ export function createInitialState(now = Date.now()): GameState {
     gaugeTarget: 0,
     gaugeReadyAt: 0,
     gaugeHits: 0,
+    catalystActive: false,
+    catalystSeconds: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

@@ -19,6 +19,7 @@ try {
   const overclock = await server.ssrLoadModule('/src/game/overclock.ts');
   const fold = await server.ssrLoadModule('/src/game/fold.ts');
   const gauge = await server.ssrLoadModule('/src/game/gauge.ts');
+  const catalyst = await server.ssrLoadModule('/src/game/catalyst.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -236,6 +237,32 @@ try {
   assert.equal(gauge.pickGauge(gaugeState, 1, 0, gaugeNow + 2_000 + 8_000, () => 0.9), 20);
   assert.equal(gaugeState.gaugeTarget, 2);
 
+  assert.equal(catalyst.catalystDrainPerSecond(0), 0.5);
+  assert.equal(catalyst.catalystDrainPerSecond(10), 2);
+  const catState = createInitialState(0);
+  catState.totalClips = 180;
+  catState.clips = 100;
+  catState.machines.autoClipper = 10;
+  assert.equal(catalyst.isCatalystUnlocked(catState), true);
+  const unboosted = clips.productionPerSecond(catState);
+  assert.ok(unboosted > 0);
+  assert.equal(catalyst.catalystMultiplier(catState), 1);
+  assert.equal(catalyst.toggleCatalyst(catState, unboosted), true);
+  assert.equal(catState.catalystActive, true);
+  assert.equal(catalyst.catalystMultiplier(catState), 1.4);
+  assert.ok(Math.abs(clips.productionPerSecond(catState) - unboosted * 1.4) < 1e-9);
+  assert.equal(clips.clickProduction(catState), 1);
+  const drained = catalyst.tickCatalyst(catState, 1, unboosted);
+  assert.equal(drained, catalyst.catalystDrainPerSecond(unboosted));
+  assert.ok(Math.abs(catState.clips - (100 - drained)) < 1e-9);
+  assert.equal(catState.catalystSeconds, 1);
+  assert.equal(catalyst.toggleCatalyst(catState, unboosted), true);
+  assert.equal(catState.catalystActive, false);
+  catState.clips = 0.1;
+  catState.catalystActive = true;
+  assert.equal(catalyst.tickCatalyst(catState, 1, unboosted), 0);
+  assert.equal(catState.catalystActive, false);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -371,6 +398,8 @@ try {
   assert.equal(legacyLoaded.state.gaugeTarget, 0);
   assert.equal(legacyLoaded.state.gaugeReadyAt, 0);
   assert.equal(legacyLoaded.state.gaugeHits, 0);
+  assert.equal(legacyLoaded.state.catalystActive, false);
+  assert.equal(legacyLoaded.state.catalystSeconds, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

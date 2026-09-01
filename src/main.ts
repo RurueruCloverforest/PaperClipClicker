@@ -20,6 +20,7 @@ import { chargeCapacitor, claimCapacitor as emptyCapacitor } from './game/capaci
 import { startOverclock as sendOverclock } from './game/overclock';
 import { startFold as sendFold } from './game/fold';
 import { pickGauge as chooseGauge } from './game/gauge';
+import { catalystMultiplier, tickCatalyst, toggleCatalyst as flipCatalyst } from './game/catalyst';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -590,6 +591,18 @@ const ui = new GameUi(app, {
     ui.announce(message, 'success');
     ui.addLog('GAUGE', message);
     updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  toggleCatalyst: () => {
+    const unboosted = productionPerSecond(state) / catalystMultiplier(state);
+    const wasActive = state.catalystActive;
+    if (!flipCatalyst(state, unboosted)) return;
+    if (state.catalystActive && !wasActive) {
+      const message = '触媒滴下を開始：設備 ×1.4';
+      ui.announce(message, 'success');
+      ui.addLog('DRIP', message);
+    }
     ui.render(state, true);
     saveGame(state);
   },
@@ -1300,6 +1313,7 @@ if (loaded.offlineSeconds >= 2 && loaded.offlineClips > 0) {
 const loop = new GameLoop((elapsedSeconds) => {
   produceForDuration(state, elapsedSeconds);
   chargeCapacitor(state, elapsedSeconds);
+  tickCatalyst(state, elapsedSeconds, productionPerSecond(state) / catalystMultiplier(state));
   state.playTimeSeconds += elapsedSeconds;
   autoBuyAccumulator += elapsedSeconds;
   while (autoBuyAccumulator >= 1) {

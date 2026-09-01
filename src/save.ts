@@ -1,6 +1,7 @@
 import { createInitialState, MACHINE_IDS, UPGRADE_IDS, type DirectiveId, type GameState, type MachineId, type PurchaseMode, type SignalBuffId, type SurveyId, type Theme, type UpgradeId } from './state';
-import { produceForDuration } from './game/clips';
+import { produceForDuration, productionPerSecond } from './game/clips';
 import { chargeCapacitor } from './game/capacitor';
+import { catalystMultiplier, tickCatalyst } from './game/catalyst';
 import { PHASES } from './game/progression';
 import { markReachedPhaseRewardsGranted } from './game/observation';
 
@@ -96,6 +97,8 @@ function normalize(raw: unknown, now: number): GameState {
     gaugeTarget: raw.gaugeTarget === 1 || raw.gaugeTarget === 2 ? raw.gaugeTarget : 0,
     gaugeReadyAt: finite(raw.gaugeReadyAt, 0),
     gaugeHits: Math.floor(finite(raw.gaugeHits, 0)),
+    catalystActive: raw.catalystActive === true,
+    catalystSeconds: finite(raw.catalystSeconds, 0),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };
@@ -135,6 +138,7 @@ export function loadGame(now = Date.now()): LoadResult {
     const elapsed = Math.min(MAX_OFFLINE_SECONDS, Math.max(0, (now - state.lastSavedAt) / 1000));
     const offlineClips = produceForDuration(state, elapsed);
     chargeCapacitor(state, elapsed);
+    tickCatalyst(state, elapsed, productionPerSecond(state) / catalystMultiplier(state));
     state.lastSavedAt = now;
     return { state, offlineSeconds: elapsed, offlineClips, recovered: false };
   } catch {
