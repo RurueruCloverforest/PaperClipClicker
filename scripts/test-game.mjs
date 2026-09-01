@@ -15,6 +15,7 @@ try {
   const directives = await server.ssrLoadModule('/src/game/directives.ts');
   const reboot = await server.ssrLoadModule('/src/game/reboot.ts');
   const survey = await server.ssrLoadModule('/src/game/survey.ts');
+  const capacitor = await server.ssrLoadModule('/src/game/capacitor.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -156,6 +157,19 @@ try {
   assert.equal(surveyState.surveysRecovered, 1);
   assert.equal(survey.surveyStatus(surveyState, 'near', 16_000), 'idle');
 
+  const capState = createInitialState(0);
+  capState.totalClips = 100;
+  capState.machines.autoClipper = 10;
+  assert.equal(capacitor.isCapacitorUnlocked(capState), true);
+  assert.equal(capacitor.capacitorCapacity(createInitialState(0)), 50);
+  const charged = capacitor.chargeCapacitor(capState, 10);
+  assert.ok(charged > 0);
+  const claimed = capacitor.claimCapacitor(capState);
+  assert.equal(claimed, charged);
+  assert.equal(capState.capacitorStored, 0);
+  assert.equal(capState.capacitorClaims, 1);
+  assert.equal(capacitor.claimCapacitor(capState), 0);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -281,6 +295,8 @@ try {
   assert.equal(legacyLoaded.state.causalCollapseSuccesses, 0);
   assert.equal(legacyLoaded.state.surveysRecovered, 0);
   assert.equal(legacyLoaded.state.maxClickCombo, 0);
+  assert.equal(legacyLoaded.state.capacitorStored, 0);
+  assert.equal(legacyLoaded.state.capacitorClaims, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

@@ -1,5 +1,6 @@
 import { createInitialState, MACHINE_IDS, UPGRADE_IDS, type DirectiveId, type GameState, type MachineId, type PurchaseMode, type SignalBuffId, type SurveyId, type Theme, type UpgradeId } from './state';
 import { produceForDuration } from './game/clips';
+import { chargeCapacitor } from './game/capacitor';
 import { PHASES } from './game/progression';
 import { markReachedPhaseRewardsGranted } from './game/observation';
 
@@ -85,6 +86,8 @@ function normalize(raw: unknown, now: number): GameState {
     causalCollapseSuccesses: Math.floor(finite(raw.causalCollapseSuccesses, 0)),
     surveysRecovered: Math.floor(finite(raw.surveysRecovered, 0)),
     maxClickCombo: Math.floor(finite(raw.maxClickCombo, 0)),
+    capacitorStored: finite(raw.capacitorStored, 0),
+    capacitorClaims: Math.floor(finite(raw.capacitorClaims, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };
@@ -123,6 +126,7 @@ export function loadGame(now = Date.now()): LoadResult {
     const state = normalize(JSON.parse(raw), now);
     const elapsed = Math.min(MAX_OFFLINE_SECONDS, Math.max(0, (now - state.lastSavedAt) / 1000));
     const offlineClips = produceForDuration(state, elapsed);
+    chargeCapacitor(state, elapsed);
     state.lastSavedAt = now;
     return { state, offlineSeconds: elapsed, offlineClips, recovered: false };
   } catch {

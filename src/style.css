@@ -235,6 +235,16 @@ main { padding: 28px 0 12px; }
 .next-goal__heading strong { margin-top: 4px; font-size: 12px; }
 .next-goal__numbers { text-align: right; }
 .next-goal__numbers strong { color: var(--accent); font: 600 13px var(--font-mono); }
+.capacitor { position: relative; z-index: 1; width: min(620px, 100%); margin: 12px auto 0; padding: 12px 17px; border: 1px solid var(--border); background: color-mix(in srgb, var(--panel-strong) 82%, transparent); text-align: left; }
+.capacitor[hidden] { display: none; }
+.capacitor__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.capacitor__heading small { color: var(--accent); font: 500 8px var(--font-mono); letter-spacing: .13em; }
+.capacitor__heading strong { display: block; margin-top: 3px; font: 600 12px var(--font-mono); }
+.capacitor__heading button { min-height: 44px; min-width: 88px; padding: 0 12px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; font: 700 11px var(--font-ui); }
+.capacitor__heading button:not(:disabled):hover { color: var(--accent-ink); background: var(--accent); }
+.capacitor__heading button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.capacitor .progress-track { height: 4px; margin-top: 10px; }
+.capacitor[data-full='true'] .capacitor__heading strong { color: var(--accent); }
 .bonus-event {
   position: absolute;
   z-index: 4;

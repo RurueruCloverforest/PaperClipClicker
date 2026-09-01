@@ -16,6 +16,7 @@ import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration,
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
 import { SURVEYS, collectSurvey as recoverSurvey, launchSurvey as sendSurvey } from './game/survey';
+import { chargeCapacitor, claimCapacitor as emptyCapacitor } from './game/capacitor';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -543,6 +544,16 @@ const ui = new GameUi(app, {
     const message = `${survey.name}帰還：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
     ui.announce(message, 'success');
     ui.addLog('PROBE', message);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  claimCapacitor: () => {
+    const amount = emptyCapacitor(state);
+    if (amount <= 0) return;
+    const message = `余剰コンデンサ回収：+${Math.floor(amount).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('BANK', message);
     updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
@@ -1253,6 +1264,7 @@ if (loaded.offlineSeconds >= 2 && loaded.offlineClips > 0) {
 
 const loop = new GameLoop((elapsedSeconds) => {
   produceForDuration(state, elapsedSeconds);
+  chargeCapacitor(state, elapsedSeconds);
   state.playTimeSeconds += elapsedSeconds;
   autoBuyAccumulator += elapsedSeconds;
   while (autoBuyAccumulator >= 1) {
