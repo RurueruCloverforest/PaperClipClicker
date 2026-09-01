@@ -11,6 +11,7 @@ import { DIRECTIVES, canClaimDirective, directiveReward, directiveTarget } from 
 import { REBOOT_PREVIEW_THRESHOLD, REBOOT_THRESHOLD, canReboot, rebootCoreGain, rebootMultiplier } from '../game/reboot';
 import { SURVEYS, isSurveyUnlocked, surveyCost, surveyReward, surveyStatus } from '../game/survey';
 import { capacitorCapacity, isCapacitorUnlocked } from '../game/capacitor';
+import { canStartOverclock, isOverclockActive, isOverclockUnlocked, overclockCost } from '../game/overclock';
 
 export interface UiActions {
   makeClip: (event: MouseEvent) => void;
@@ -46,6 +47,7 @@ export interface UiActions {
   launchSurvey: (id: SurveyId) => void;
   collectSurvey: (id: SurveyId) => void;
   claimCapacitor: () => void;
+  startOverclock: (id: MachineId) => void;
   activateSignalBuff: (id: SignalBuffId) => void;
   claimDirective: (id: DirectiveId) => void;
   rebootProtocol: () => void;
@@ -63,6 +65,10 @@ interface MachineCardRefs {
   milestoneProgress: HTMLElement;
   autoRow: HTMLElement;
   autoInput: HTMLInputElement;
+  overclockRow: HTMLElement;
+  overclockButton: HTMLButtonElement;
+  overclockStatus: HTMLElement;
+  overclockBadge: HTMLElement;
   peek: HTMLButtonElement;
 }
 
@@ -171,6 +177,7 @@ export class GameUi {
   private readonly capacitorProgress: HTMLElement;
   private readonly capacitorButton: HTMLButtonElement;
   private readonly capacitorClaimCount: HTMLElement;
+  private readonly overclockCount: HTMLElement;
   private readonly reducedMotionQuery: MediaQueryList | null;
   private tickerPhaseId = '';
   private tickerIntervalId = 0;
@@ -186,7 +193,7 @@ export class GameUi {
     this.root.insertAdjacentHTML('beforeend', this.precisionTargetTemplate());
     this.root.insertAdjacentHTML('beforeend', this.interiorTemplate());
     required<HTMLElement>(root, '.hero').insertAdjacentHTML('beforeend', this.bonusEventTemplate());
-    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div><div><dt>探査帰還</dt><dd id="survey-recovered-count">0</dd></div><div><dt>最高連鎖</dt><dd id="max-click-combo">0</dd></div><div><dt>コンデンサ回収</dt><dd id="capacitor-claim-count">0</dd></div>');
+    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div><div><dt>探査帰還</dt><dd id="survey-recovered-count">0</dd></div><div><dt>最高連鎖</dt><dd id="max-click-combo">0</dd></div><div><dt>コンデンサ回収</dt><dd id="capacitor-claim-count">0</dd></div><div><dt>設備過負荷</dt><dd id="overclock-count">0</dd></div>');
     required<HTMLElement>(root, '.dashboard').insertAdjacentHTML('afterend', this.achievementPanelTemplate());
     required<HTMLElement>(root, '.achievement-panel').insertAdjacentHTML('afterend', this.signalLabTemplate());
     required<HTMLElement>(root, '#signal-lab').insertAdjacentHTML('afterend', this.directivePanelTemplate());
@@ -274,6 +281,7 @@ export class GameUi {
     this.capacitorProgress = required(root, '#capacitor-progress');
     this.capacitorButton = required(root, '#claim-capacitor');
     this.capacitorClaimCount = required(root, '#capacitor-claim-count');
+    this.overclockCount = required(root, '#overclock-count');
     this.reducedMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.reducedMotionQuery?.addEventListener('change', () => this.refreshTicker(this.tickerPhaseId));
     this.bindEvents();
@@ -308,6 +316,7 @@ export class GameUi {
     this.surveyRecoveredCount.textContent = String(state.surveysRecovered);
     this.maxClickComboCount.textContent = String(state.maxClickCombo);
     this.capacitorClaimCount.textContent = String(state.capacitorClaims);
+    this.overclockCount.textContent = String(state.overclockCount);
     this.renderCapacitor(state, format);
     this.themeSelect.value = state.settings.theme;
     this.compactToggle.checked = state.settings.compactNumbers;
@@ -1024,7 +1033,7 @@ export class GameUi {
         card.className = 'shop-card';
         const tier = Math.ceil(((MACHINES.indexOf(machine) + 1) / MACHINES.length) * 4);
         const icon = MACHINE_ARTWORK[machine.id];
-        card.innerHTML = `<button type="button" class="shop-card__peek shop-card__icon" data-tier="${tier}" data-peek="${machine.id}" disabled aria-label="${escapeHtml(machine.name)}の内部をのぞく"><img src="${escapeHtml(icon.src)}" alt="" width="${icon.width}" height="${icon.height}" /><span class="shop-card__glyph">${escapeHtml(machine.icon)}</span></button><div class="shop-card__body"><div class="shop-card__heading"><h3>${escapeHtml(machine.name)}</h3><span class="owned" data-count></span></div><p>${escapeHtml(machine.description)}</p><span class="production" data-production></span><div class="milestone"><div class="milestone__meta"><span data-milestone-name>次：安定稼働</span><span data-milestone-count>0 / 10</span><strong data-milestone-multiplier>×1</strong></div><div class="milestone__track" aria-hidden="true"><span data-milestone-progress></span></div></div><div class="auto-toggle" data-auto-toggle hidden><span class="auto-toggle__label">自動購入</span><input type="checkbox" role="switch" class="auto-toggle__input" data-auto-input aria-label="${escapeHtml(machine.name)}の自動購入" /></div></div><button class="buy-button" type="button" data-buy-machine="${machine.id}"><span>購入</span><strong data-price></strong></button>`;
+        card.innerHTML = `<button type="button" class="shop-card__peek shop-card__icon" data-tier="${tier}" data-peek="${machine.id}" disabled aria-label="${escapeHtml(machine.name)}の内部をのぞく"><img src="${escapeHtml(icon.src)}" alt="" width="${icon.width}" height="${icon.height}" /><span class="shop-card__glyph">${escapeHtml(machine.icon)}</span></button><div class="shop-card__body"><div class="shop-card__heading"><h3>${escapeHtml(machine.name)}</h3><span class="overclock-badge" data-overclock-badge hidden></span><span class="owned" data-count></span></div><p>${escapeHtml(machine.description)}</p><span class="production" data-production></span><div class="milestone"><div class="milestone__meta"><span data-milestone-name>次：安定稼働</span><span data-milestone-count>0 / 10</span><strong data-milestone-multiplier>×1</strong></div><div class="milestone__track" aria-hidden="true"><span data-milestone-progress></span></div></div><div class="auto-toggle" data-auto-toggle hidden><span class="auto-toggle__label">自動購入</span><input type="checkbox" role="switch" class="auto-toggle__input" data-auto-input aria-label="${escapeHtml(machine.name)}の自動購入" /></div><div class="overclock-row" data-overclock-row hidden><button type="button" data-overclock="${machine.id}"><span>過負荷</span><small>×3 / 20s</small></button><strong data-overclock-status></strong></div></div><button class="buy-button" type="button" data-buy-machine="${machine.id}"><span>購入</span><strong data-price></strong></button>`;
         const iconImage = required<HTMLImageElement>(card, '.shop-card__icon img');
         const glyph = required<HTMLElement>(card, '.shop-card__glyph');
         iconImage.addEventListener('error', () => {
@@ -1038,6 +1047,8 @@ export class GameUi {
         autoInput.addEventListener('change', () => this.actions.toggleAutoBuy(machine.id, autoInput.checked));
         const peek = required<HTMLButtonElement>(card, '[data-peek]');
         peek.addEventListener('click', () => this.actions.openInterior(machine.id));
+        const overclockButton = required<HTMLButtonElement>(card, '[data-overclock]');
+        overclockButton.addEventListener('click', () => this.actions.startOverclock(machine.id));
         this.machineCards.set(machine.id, {
           card,
           count: required(card, '[data-count]'),
@@ -1050,12 +1061,20 @@ export class GameUi {
           milestoneProgress: required(card, '[data-milestone-progress]'),
           autoRow: required(card, '[data-auto-toggle]'),
           autoInput,
+          overclockRow: required(card, '[data-overclock-row]'),
+          overclockButton,
+          overclockStatus: required(card, '[data-overclock-status]'),
+          overclockBadge: required(card, '[data-overclock-badge]'),
           peek,
         });
       }
       this.lastMachineSignature = signature;
     }
     const autoUnlocked = isAutoBuyUnlocked(state);
+    const overclockUnlocked = isOverclockUnlocked(state);
+    const nowMs = Date.now();
+    const productionRate = productionPerSecond(state);
+    const overclockPrice = overclockCost(productionRate);
     for (const machine of visible) {
       const refs = this.machineCards.get(machine.id);
       if (!refs) continue;
@@ -1066,6 +1085,20 @@ export class GameUi {
       refs.peek.disabled = count < 1;
       refs.peek.setAttribute('aria-label', count < 1 ? `${machine.name}は所有後に内部をのぞけます` : `${machine.name}の内部をのぞく`);
       refs.card.classList.toggle('shop-card--auto', autoUnlocked && state.autoBuyEnabled[machine.id]);
+      const overclocked = isOverclockActive(state, machine.id, nowMs);
+      const remainLabel = overclocked ? `OVERLOAD ${this.formatCountdown((state.overclockExpiresAt - nowMs) / 1000)}` : '';
+      refs.overclockRow.hidden = !overclockUnlocked || count < 1;
+      refs.overclockBadge.hidden = !overclocked;
+      refs.overclockBadge.textContent = remainLabel;
+      refs.overclockStatus.textContent = remainLabel;
+      refs.card.classList.toggle('shop-card--overclock', overclocked);
+      const canStart = canStartOverclock(state, machine.id, productionRate, nowMs);
+      refs.overclockButton.disabled = !canStart;
+      refs.overclockButton.setAttribute('aria-label', overclocked
+        ? `${machine.name}、過負荷残り${this.formatCountdown((state.overclockExpiresAt - nowMs) / 1000)}`
+        : canStart
+          ? `${machine.name}を${format(overclockPrice)}クリップで過負荷`
+          : `${machine.name}は過負荷できません`);
       refs.count.textContent = `${count} 台`;
       refs.production.textContent = `合計 ${format(machineTotalProduction(state, machine.id))} / 秒 · 1台 ${format(machineUnitProduction(state, machine.id))}`;
       const milestone = milestoneStatus(count);

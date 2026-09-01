@@ -17,6 +17,7 @@ import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives'
 import { createRebootedState, rebootCoreGain } from './game/reboot';
 import { SURVEYS, collectSurvey as recoverSurvey, launchSurvey as sendSurvey } from './game/survey';
 import { chargeCapacitor, claimCapacitor as emptyCapacitor } from './game/capacitor';
+import { startOverclock as sendOverclock } from './game/overclock';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -555,6 +556,14 @@ const ui = new GameUi(app, {
     ui.announce(message, 'success');
     ui.addLog('BANK', message);
     updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  startOverclock: (id) => {
+    if (!sendOverclock(state, id, productionPerSecond(state))) return;
+    const message = `${getMachine(id).name}を過負荷：20秒 ×3`;
+    ui.announce(message, 'success');
+    ui.addLog('OVER', message);
     ui.render(state, true);
     saveGame(state);
   },

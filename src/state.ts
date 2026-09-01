@@ -44,6 +44,9 @@ export interface GameState {
   maxClickCombo: number;
   capacitorStored: number;
   capacitorClaims: number;
+  overclockMachine: MachineId | null;
+  overclockExpiresAt: number;
+  overclockCount: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -88,6 +91,9 @@ export function createInitialState(now = Date.now()): GameState {
     maxClickCombo: 0,
     capacitorStored: 0,
     capacitorClaims: 0,
+    overclockMachine: null,
+    overclockExpiresAt: 0,
+    overclockCount: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

@@ -16,6 +16,7 @@ try {
   const reboot = await server.ssrLoadModule('/src/game/reboot.ts');
   const survey = await server.ssrLoadModule('/src/game/survey.ts');
   const capacitor = await server.ssrLoadModule('/src/game/capacitor.ts');
+  const overclock = await server.ssrLoadModule('/src/game/overclock.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -170,6 +171,28 @@ try {
   assert.equal(capState.capacitorClaims, 1);
   assert.equal(capacitor.claimCapacitor(capState), 0);
 
+  assert.equal(overclock.overclockCost(0), 250);
+  assert.equal(overclock.overclockCost(20), 500);
+  const ocState = createInitialState(0);
+  ocState.totalClips = 250;
+  ocState.clips = 250;
+  ocState.machines.autoClipper = 1;
+  assert.equal(overclock.isOverclockUnlocked(ocState), true);
+  const baseRate = clips.machineUnitProduction(ocState, 'autoClipper');
+  const ocNow = Date.now();
+  assert.equal(overclock.canStartOverclock(ocState, 'autoClipper', 0, ocNow), true);
+  assert.equal(overclock.startOverclock(ocState, 'autoClipper', 0, ocNow), true);
+  assert.equal(ocState.overclockMachine, 'autoClipper');
+  assert.equal(ocState.overclockExpiresAt, ocNow + 20_000);
+  assert.equal(ocState.overclockCount, 1);
+  assert.equal(ocState.clips, 0);
+  assert.equal(overclock.overclockMultiplier(ocState, 'autoClipper', ocNow), 3);
+  assert.equal(overclock.overclockMultiplier(ocState, 'wireMachine', ocNow), 1);
+  assert.equal(clips.machineUnitProduction(ocState, 'autoClipper'), baseRate * 3);
+  assert.equal(overclock.canStartOverclock(ocState, 'wireMachine', 0, ocNow), false);
+  assert.equal(overclock.overclockMultiplier(ocState, 'autoClipper', ocNow + 20_000), 1);
+  assert.equal(clips.clickProduction(ocState), 1);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -297,6 +320,9 @@ try {
   assert.equal(legacyLoaded.state.maxClickCombo, 0);
   assert.equal(legacyLoaded.state.capacitorStored, 0);
   assert.equal(legacyLoaded.state.capacitorClaims, 0);
+  assert.equal(legacyLoaded.state.overclockMachine, null);
+  assert.equal(legacyLoaded.state.overclockExpiresAt, 0);
+  assert.equal(legacyLoaded.state.overclockCount, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

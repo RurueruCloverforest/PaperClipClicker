@@ -359,6 +359,20 @@ main { padding: 28px 0 12px; }
 .auto-toggle__input { appearance: none; width: 34px; height: 18px; padding: 2px; border: 1px solid var(--border-bright); border-radius: 20px; background: var(--bg); cursor: pointer; }
 .auto-toggle__input::after { content: ''; display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform 160ms, background 160ms; }
 .auto-toggle__input:checked::after { transform: translateX(15px); background: var(--accent); }
+.overclock-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.overclock-row[hidden] { display: none; }
+.overclock-row button { min-height: 44px; padding: 0 10px; border: 1px solid var(--warning); color: var(--warning); background: transparent; cursor: pointer; }
+.overclock-row button span, .overclock-row button small { display: block; }
+.overclock-row button span { font: 700 10px var(--font-ui); }
+.overclock-row button small { margin-top: 2px; font: 600 7px var(--font-mono); letter-spacing: .1em; }
+.overclock-row button:not(:disabled):hover { color: #261808; background: var(--warning); }
+.overclock-row button:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+.overclock-row button:focus-visible { outline: 2px solid var(--warning); outline-offset: 2px; }
+.overclock-row strong { color: var(--warning); font: 700 9px var(--font-mono); letter-spacing: .08em; }
+.overclock-badge { color: var(--warning); font: 700 8px var(--font-mono); letter-spacing: .08em; white-space: nowrap; }
+.overclock-badge[hidden] { display: none; }
+.shop-card--overclock { box-shadow: inset 0 2px 0 var(--warning); }
+.shop-card--auto.shop-card--overclock { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent), inset 0 2px 0 var(--warning); }
 .buy-button { min-height: 58px; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 2px; color: var(--accent); background: transparent; cursor: pointer; transition: color 140ms, background 140ms, opacity 140ms; }
 .buy-button span, .buy-button strong { display: block; }
 .buy-button span { font-size: 12px; font-weight: 700; }
