@@ -244,6 +244,7 @@ try {
   assert.equal(legacyLoaded.state.nanoPurgeSuccesses, 0);
   assert.equal(legacyLoaded.state.swarmSyncSuccesses, 0);
   assert.equal(legacyLoaded.state.orbitalBerthSuccesses, 0);
+  assert.equal(legacyLoaded.state.matterCompileSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -336,6 +337,17 @@ try {
   assert.equal(orbitalReward, 6_000);
   assert.equal(orbitalState.orbitalBerthSuccesses, 3);
   assert.equal(orbitalState.clips, 6_000);
+  assert.deepEqual(interior.randomMatterBoard(() => 0), ['ore', 'dust', 'dust', 'flux', 'flux', 'ore']);
+  assert.equal(interior.isMatterPair(['ore', 'dust', 'dust', 'flux', 'flux', 'ore'], 1, 2), true);
+  assert.equal(interior.isMatterPair(['ore', 'dust', 'dust', 'flux', 'flux', 'ore'], 0, 1), false);
+  assert.equal(interior.isMatterRoundSuccess([true, true, true, true, true, true]), true);
+  assert.equal(interior.isMatterRoundSuccess([true, true, true, true, true, false]), false);
+  assert.equal(interior.matterPairsRemaining([true, true, false, false, false, false]), 2);
+  const matterState = createInitialState(0);
+  const matterReward = interior.applyMatterCompileReward(matterState, 3);
+  assert.equal(matterReward, 7_500);
+  assert.equal(matterState.matterCompileSuccesses, 3);
+  assert.equal(matterState.clips, 7_500);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 

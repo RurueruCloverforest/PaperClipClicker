@@ -10,7 +10,7 @@ import { grantDuePhaseRewards } from './game/observation';
 import { crossedMilestones } from './game/milestones';
 import { ACHIEVEMENTS, unlockedAchievementIds } from './game/achievements';
 import { applyBonusReward, applyPrecisionReward, chooseBonusOutcome, nextBonusDelay, nextPrecisionDelay, precisionClickTarget, precisionPosition } from './game/bonusEvents';
-import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyNanoPurgeReward, applyOrbitalBerthReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isNanoWasteCell, isOrbitalBerthSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, orbitalTarget, randomInteriorPosition, randomNanoWaste, randomOrbitalBlocked, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type TraceNodeId } from './game/interior';
+import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyOrbitalBerthReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isOrbitalBerthSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, randomMatterBoard, randomNanoWaste, randomOrbitalBlocked, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type TraceNodeId } from './game/interior';
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
@@ -95,6 +95,17 @@ let orbitalResults: boolean[] = [];
 let orbitalPhase: 'play' | 'result' | 'cooldown' = 'play';
 let orbitalNextRoundAt = 0;
 let orbitalCooldownUntil = 0;
+let matterRound = 1;
+let matterSuccesses = 0;
+let matterAttempts = 0;
+let matterBoard: MatterKind[] = [];
+let matterCompiled = Array.from({ length: MATTER_CELLS }, () => false);
+let matterArmed: number | null = null;
+let matterFault: number | null = null;
+let matterResults: boolean[] = [];
+let matterPhase: 'play' | 'result' | 'cooldown' = 'play';
+let matterNextRoundAt = 0;
+let matterCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 
 function prefersReducedMotion(): boolean {
@@ -208,6 +219,51 @@ function beginOrbitalRound(): void {
   orbitalPhase = 'play';
   orbitalNextRoundAt = 0;
   renderOrbitalConsole(`RANGE · 連続${orbitalTarget(orbitalRound)}ドックを係留`, false);
+}
+
+function renderMatterConsole(message = '同じ物質署名を2つ束ねてください', disabled = matterPhase !== 'play' || performance.now() < matterCooldownUntil): void {
+  const waiting = performance.now() < matterCooldownUntil;
+  ui.setMatterCompile(
+    matterRound,
+    matterSuccesses,
+    matterBoard,
+    matterCompiled,
+    matterArmed,
+    matterFault,
+    matterResults,
+    waiting ? 'cooldown' : matterPhase,
+    message,
+    disabled,
+  );
+}
+
+function beginMatterRound(): void {
+  matterBoard = randomMatterBoard();
+  matterCompiled = Array.from({ length: MATTER_CELLS }, () => false);
+  matterArmed = null;
+  matterFault = null;
+  matterPhase = 'play';
+  matterNextRoundAt = 0;
+  renderMatterConsole('PAIR · 同じ署名を束ねる', false);
+}
+
+function finishMatterRound(now: number, success: boolean): void {
+  renderMatterConsole(success ? 'COMPILED · 対変換完了' : 'REJECT · 署名不一致', true);
+  if (matterAttempts >= MATTER_ROUNDS) {
+    const reward = applyMatterCompileReward(state, matterSuccesses);
+    matterCooldownUntil = now + MATTER_COOLDOWN_MS;
+    matterPhase = 'cooldown';
+    const message = `対コンパイル：${matterSuccesses} / ${MATTER_ROUNDS}成功${reward > 0 ? ` +${Math.floor(reward).toLocaleString('ja-JP')}クリップ` : ''}`;
+    ui.setInteriorStatus(message);
+    ui.announce(message, matterSuccesses > 0 ? 'success' : 'warning');
+    ui.addLog('MATTR', message);
+    renderMatterConsole('STANDBY · 再変換待機', true);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  } else {
+    matterNextRoundAt = now + MATTER_RESULT_MS;
+  }
 }
 
 function scheduleNextBonus(now = performance.now()): void {
@@ -401,6 +457,18 @@ const ui = new GameUi(app, {
       orbitalPhase = now < orbitalCooldownUntil ? 'cooldown' : 'play';
       if (now < orbitalCooldownUntil) renderOrbitalConsole(`再係留待機 · 残り${Math.ceil((orbitalCooldownUntil - now) / 1000)}秒`, true);
       else beginOrbitalRound();
+    } else if (id === MATTER_INTERIOR) {
+      matterRound = 1;
+      matterSuccesses = 0;
+      matterAttempts = 0;
+      matterResults = [];
+      matterCompiled = Array.from({ length: MATTER_CELLS }, () => false);
+      matterArmed = null;
+      matterFault = null;
+      matterBoard = [];
+      matterPhase = now < matterCooldownUntil ? 'cooldown' : 'play';
+      if (now < matterCooldownUntil) renderMatterConsole(`再変換待機 · 残り${Math.ceil((matterCooldownUntil - now) / 1000)}秒`, true);
+      else beginMatterRound();
     }
   },
   closeInterior: () => {
@@ -419,6 +487,7 @@ const ui = new GameUi(app, {
     if (interiorMachine === NANO_INTERIOR && nanoAttempts > 0 && nanoAttempts < NANO_ROUNDS) nanoCooldownUntil = performance.now() + NANO_COOLDOWN_MS;
     if (interiorMachine === SWARM_INTERIOR && swarmAttempts > 0 && swarmAttempts < SWARM_ROUNDS) swarmCooldownUntil = performance.now() + SWARM_COOLDOWN_MS;
     if (interiorMachine === ORBITAL_INTERIOR && orbitalAttempts > 0 && orbitalAttempts < ORBITAL_ROUNDS) orbitalCooldownUntil = performance.now() + ORBITAL_COOLDOWN_MS;
+    if (interiorMachine === MATTER_INTERIOR && matterAttempts > 0 && matterAttempts < MATTER_ROUNDS) matterCooldownUntil = performance.now() + MATTER_COOLDOWN_MS;
     interiorMachine = null;
     interiorSessionHarvests = 0;
     interiorSessionAmount = 0;
@@ -621,6 +690,41 @@ const ui = new GameUi(app, {
       orbitalNextRoundAt = now + ORBITAL_RESULT_MS;
     }
   },
+  compileMatterCell: (index) => {
+    const now = performance.now();
+    if (interiorMachine !== MATTER_INTERIOR || now < matterCooldownUntil || matterPhase !== 'play' || matterAttempts >= MATTER_ROUNDS) return;
+    if (index < 0 || index >= MATTER_CELLS || matterCompiled[index] || matterFault !== null) return;
+    if (matterArmed === null) {
+      matterArmed = index;
+      renderMatterConsole(`PAIR · 残り ${matterPairsRemaining(matterCompiled)} 対`, false);
+      return;
+    }
+    if (matterArmed === index) {
+      matterArmed = null;
+      renderMatterConsole(`PAIR · 残り ${matterPairsRemaining(matterCompiled)} 対`, false);
+      return;
+    }
+    if (isMatterPair(matterBoard, matterArmed, index)) {
+      matterCompiled[matterArmed] = true;
+      matterCompiled[index] = true;
+      matterArmed = null;
+      if (!isMatterRoundSuccess(matterCompiled)) {
+        renderMatterConsole(`PAIR · 残り ${matterPairsRemaining(matterCompiled)} 対`, false);
+        return;
+      }
+      matterResults.push(true);
+      matterSuccesses += 1;
+      matterAttempts += 1;
+      matterPhase = 'result';
+      finishMatterRound(now, true);
+      return;
+    }
+    matterFault = index;
+    matterResults.push(false);
+    matterAttempts += 1;
+    matterPhase = 'result';
+    finishMatterRound(now, false);
+  },
   changePurchaseMode: (mode) => {
     state.purchaseMode = mode;
     ui.addLog('MODE', `購入数量を${mode === 'max' ? 'MAX' : `×${mode}`}へ変更`);
@@ -663,6 +767,7 @@ const ui = new GameUi(app, {
     nanoCooldownUntil = 0;
     swarmCooldownUntil = 0;
     orbitalCooldownUntil = 0;
+    matterCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -700,6 +805,7 @@ const ui = new GameUi(app, {
     nanoCooldownUntil = 0;
     swarmCooldownUntil = 0;
     orbitalCooldownUntil = 0;
+    matterCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -951,6 +1057,20 @@ const loop = new GameLoop((elapsedSeconds) => {
     } else if (orbitalPhase === 'result' && orbitalNextRoundAt > 0 && now >= orbitalNextRoundAt) {
       orbitalRound += 1;
       beginOrbitalRound();
+    }
+  }
+  if (interiorMachine === MATTER_INTERIOR) {
+    if (now < matterCooldownUntil) {
+      renderMatterConsole(`再変換待機 · 残り${Math.ceil((matterCooldownUntil - now) / 1000)}秒`, true);
+    } else if (matterPhase === 'cooldown') {
+      matterRound = 1;
+      matterSuccesses = 0;
+      matterAttempts = 0;
+      matterResults = [];
+      beginMatterRound();
+    } else if (matterPhase === 'result' && matterNextRoundAt > 0 && now >= matterNextRoundAt) {
+      matterRound += 1;
+      beginMatterRound();
     }
   }
   ui.render(state);

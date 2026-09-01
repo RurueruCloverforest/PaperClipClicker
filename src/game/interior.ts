@@ -254,3 +254,46 @@ export function applyOrbitalBerthReward(state: GameState, successes: number): nu
   state.orbitalBerthSuccesses += safeSuccesses;
   return amount;
 }
+
+export const MATTER_INTERIOR: MachineId = 'matterCompiler';
+export const MATTER_ROUNDS = 4;
+export const MATTER_CELLS = 6;
+export const MATTER_PAIRS = 3;
+export const MATTER_COOLDOWN_MS = 55_000;
+export const MATTER_RESULT_MS = 700;
+export const MATTER_TYPES = ['ore', 'dust', 'flux'] as const;
+export type MatterKind = (typeof MATTER_TYPES)[number];
+
+export function randomMatterBoard(random = Math.random): MatterKind[] {
+  const board: MatterKind[] = ['ore', 'ore', 'dust', 'dust', 'flux', 'flux'];
+  for (let index = board.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.max(0, Math.min(0.999999, random())) * (index + 1));
+    [board[index], board[swap]] = [board[swap]!, board[index]!];
+  }
+  return board;
+}
+
+export function isMatterPair(board: MatterKind[], first: number, second: number): boolean {
+  return first !== second && board[first] !== undefined && board[first] === board[second];
+}
+
+export function matterPairsRemaining(compiled: boolean[]): number {
+  return Math.max(0, MATTER_PAIRS - Math.floor(compiled.filter(Boolean).length / 2));
+}
+
+export function isMatterRoundSuccess(compiled: boolean[]): boolean {
+  return compiled.length >= MATTER_CELLS && compiled.slice(0, MATTER_CELLS).every(Boolean);
+}
+
+export function matterCompileUnitReward(state: GameState): number {
+  return Math.max(2_500, productionPerSecond(state) * 110, clickProduction(state) * 260);
+}
+
+export function applyMatterCompileReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(MATTER_ROUNDS, Math.floor(successes)));
+  const amount = matterCompileUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.matterCompileSuccesses += safeSuccesses;
+  return amount;
+}
