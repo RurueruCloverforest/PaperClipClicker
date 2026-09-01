@@ -21,6 +21,7 @@ try {
   const gauge = await server.ssrLoadModule('/src/game/gauge.ts');
   const catalyst = await server.ssrLoadModule('/src/game/catalyst.ts');
   const dispatch = await server.ssrLoadModule('/src/game/dispatch.ts');
+  const patch = await server.ssrLoadModule('/src/game/patch.ts');
 
   const state = createInitialState(0);
   assert.equal(combo.comboMultiplier(1), 1);
@@ -285,6 +286,30 @@ try {
   assert.equal(shipState.clips, 32);
   assert.equal(dispatch.dispatchStatus(shipState, 11_000), 'filling');
 
+  assert.equal(patch.patchCost(createInitialState(0), 0), 25);
+  assert.equal(patch.patchCost(createInitialState(0), 10), 40);
+  const priced = createInitialState(0);
+  priced.patchCount = 1;
+  assert.equal(patch.patchCost(priced, 10), 52);
+  assert.equal(patch.patchMultiplier(createInitialState(0)), 1);
+  priced.patchCount = 5;
+  assert.equal(patch.patchMultiplier(priced), 1.2);
+  priced.patchCount = 20;
+  assert.equal(patch.patchMultiplier(priced), 1.8);
+  assert.equal(patch.isPatchMaxed(priced), true);
+  const revState = createInitialState(0);
+  revState.totalClips = 120;
+  revState.clips = 10_000;
+  revState.machines.autoClipper = 10;
+  assert.equal(patch.isPatchUnlocked(revState), true);
+  const patchBase = clips.productionPerSecond(revState);
+  assert.equal(patch.buyPatch(revState, 0), true);
+  assert.equal(revState.patchCount, 1);
+  assert.ok(Math.abs(clips.productionPerSecond(revState) - patchBase * 1.04) < 1e-9);
+  assert.equal(clips.clickProduction(revState), 1);
+  revState.patchCount = 20;
+  assert.equal(patch.buyPatch(revState, 0), false);
+
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
   assert.ok(unlocked.includes('nanoForge'));
@@ -425,6 +450,7 @@ try {
   assert.equal(legacyLoaded.state.dispatchStored, 0);
   assert.equal(legacyLoaded.state.dispatchReturnsAt, 0);
   assert.equal(legacyLoaded.state.dispatchClaims, 0);
+  assert.equal(legacyLoaded.state.patchCount, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

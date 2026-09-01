@@ -7,6 +7,7 @@ import { rebootMultiplier } from './reboot';
 import { comboMultiplier } from './combo';
 import { overclockMultiplier } from './overclock';
 import { catalystMultiplier } from './catalyst';
+import { patchMultiplier } from './patch';
 
 export function machinePrice(state: GameState, id: MachineId): number {
   const machine = getMachine(id);
@@ -43,7 +44,7 @@ export function machineUnitProduction(state: GameState, id: MachineId): number {
   };
   const upgrade = upgradeByMachine[id];
   if (upgrade && state.upgrades.includes(upgrade)) multiplier *= 2;
-  return getMachine(id).baseProduction * multiplier * milestoneStatus(state.machines[id]).multiplier * achievementProductionMultiplier(state) * signalEquipmentMultiplier(state) * rebootMultiplier(state) * overclockMultiplier(state, id) * catalystMultiplier(state);
+  return getMachine(id).baseProduction * multiplier * milestoneStatus(state.machines[id]).multiplier * achievementProductionMultiplier(state) * signalEquipmentMultiplier(state) * rebootMultiplier(state) * overclockMultiplier(state, id) * catalystMultiplier(state) * patchMultiplier(state);
 }
 
 export function machineTotalProduction(state: GameState, id: MachineId): number {
