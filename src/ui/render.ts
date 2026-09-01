@@ -1,4 +1,4 @@
-import type { DirectiveId, GameState, MachineId, PurchaseMode, SignalBuffId, Theme, UpgradeId } from '../state';
+import type { DirectiveId, GameState, MachineId, PurchaseMode, SignalBuffId, SurveyId, Theme, UpgradeId } from '../state';
 import { MACHINES, UPGRADES, getMachine } from '../game/definitions';
 import { clickProduction, isAutoBuyUnlocked, isUpgradeUnlocked, machineTotalProduction, machineUnitProduction, productionPerSecond, selectedPurchase } from '../game/clips';
 import { ARTWORK, MACHINE_ARTWORK, PHASE_ARTWORK } from '../artwork';
@@ -9,6 +9,7 @@ import { NEWS_HEADLINES } from '../game/news';
 import { SIGNAL_BUFFS, activeSignalBuffs, isSignalBuffActive, signalBuffCost } from '../game/signalLab';
 import { DIRECTIVES, canClaimDirective, directiveReward, directiveTarget } from '../game/directives';
 import { REBOOT_PREVIEW_THRESHOLD, REBOOT_THRESHOLD, canReboot, rebootCoreGain, rebootMultiplier } from '../game/reboot';
+import { SURVEYS, isSurveyUnlocked, surveyCost, surveyReward, surveyStatus } from '../game/survey';
 
 export interface UiActions {
   makeClip: (event: MouseEvent) => void;
@@ -41,6 +42,8 @@ export interface UiActions {
   claimFleetCell: (index: number) => void;
   incrementCausalGauge: (index: number) => void;
   lockCausalCollapse: () => void;
+  launchSurvey: (id: SurveyId) => void;
+  collectSurvey: (id: SurveyId) => void;
   activateSignalBuff: (id: SignalBuffId) => void;
   claimDirective: (id: DirectiveId) => void;
   rebootProtocol: () => void;
@@ -157,6 +160,8 @@ export class GameUi {
   private readonly stellarSyncCount: HTMLElement;
   private readonly fleetSpreadCount: HTMLElement;
   private readonly causalCollapseCount: HTMLElement;
+  private readonly surveyRecoveredCount: HTMLElement;
+  private readonly surveyPanelCount: HTMLElement;
   private readonly reducedMotionQuery: MediaQueryList | null;
   private tickerPhaseId = '';
   private tickerIntervalId = 0;
@@ -172,11 +177,12 @@ export class GameUi {
     this.root.insertAdjacentHTML('beforeend', this.precisionTargetTemplate());
     this.root.insertAdjacentHTML('beforeend', this.interiorTemplate());
     required<HTMLElement>(root, '.hero').insertAdjacentHTML('beforeend', this.bonusEventTemplate());
-    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div>');
+    required<HTMLElement>(root, '#play-time').closest('div')?.insertAdjacentHTML('beforebegin', '<div><dt>実績</dt><dd id="achievement-count-stat">0 / 14</dd></div><div><dt>マイルストーン</dt><dd id="milestone-count">0 / 48</dd></div><div><dt>異常回収</dt><dd id="bonus-event-count">0</dd></div><div><dt>精密成功</dt><dd id="precision-count">0</dd></div><div><dt>内部回収</dt><dd id="interior-harvest-count">0</dd></div><div><dt>張力校正</dt><dd id="wire-calibration-count">0</dd></div><div><dt>品質判定</dt><dd id="factory-quality-count">0</dd></div><div><dt>改善トレース</dt><dd id="trace-ai-count">0</dd></div><div><dt>不純物除去</dt><dd id="nano-purge-count">0</dd></div><div><dt>群同期</dt><dd id="swarm-sync-count">0</dd></div><div><dt>環状係留</dt><dd id="orbital-berth-count">0</dd></div><div><dt>対コンパイル</dt><dd id="matter-compile-count">0</dd></div><div><dt>採掘オーダー</dt><dd id="planet-strip-count">0</dd></div><div><dt>集光同調</dt><dd id="stellar-sync-count">0</dd></div><div><dt>複製展開</dt><dd id="fleet-spread-count">0</dd></div><div><dt>因果収束</dt><dd id="causal-collapse-count">0</dd></div><div><dt>探査帰還</dt><dd id="survey-recovered-count">0</dd></div>');
     required<HTMLElement>(root, '.dashboard').insertAdjacentHTML('afterend', this.achievementPanelTemplate());
     required<HTMLElement>(root, '.achievement-panel').insertAdjacentHTML('afterend', this.signalLabTemplate());
     required<HTMLElement>(root, '#signal-lab').insertAdjacentHTML('afterend', this.directivePanelTemplate());
     required<HTMLElement>(root, '#directive-panel').insertAdjacentHTML('afterend', this.rebootPanelTemplate());
+    required<HTMLElement>(root, '#reboot-panel').insertAdjacentHTML('afterend', this.surveyPanelTemplate());
     this.clips = required(root, '#clips-value');
     this.perSecond = required(root, '#per-second');
     this.perClick = required(root, '#per-click');
@@ -250,6 +256,8 @@ export class GameUi {
     this.stellarSyncCount = required(root, '#stellar-sync-count');
     this.fleetSpreadCount = required(root, '#fleet-spread-count');
     this.causalCollapseCount = required(root, '#causal-collapse-count');
+    this.surveyRecoveredCount = required(root, '#survey-recovered-count');
+    this.surveyPanelCount = required(root, '#survey-panel-count');
     this.reducedMotionQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.reducedMotionQuery?.addEventListener('change', () => this.refreshTicker(this.tickerPhaseId));
     this.bindEvents();
@@ -281,6 +289,7 @@ export class GameUi {
     this.stellarSyncCount.textContent = String(state.stellarSyncSuccesses);
     this.fleetSpreadCount.textContent = String(state.fleetSpreadSuccesses);
     this.causalCollapseCount.textContent = String(state.causalCollapseSuccesses);
+    this.surveyRecoveredCount.textContent = String(state.surveysRecovered);
     this.themeSelect.value = state.settings.theme;
     this.compactToggle.checked = state.settings.compactNumbers;
     this.milestoneTotal.textContent = `${totalAchievedMilestones(state)} / ${TOTAL_MILESTONES}`;
@@ -288,6 +297,7 @@ export class GameUi {
     this.renderSignalLab(state, format);
     this.renderDirectives(state, format);
     this.renderReboot(state, format);
+    this.renderSurvey(state, format);
     const phase = currentPhase(state);
     this.phaseName.textContent = phase.name;
     document.documentElement.dataset.phase = phase.id;
@@ -1144,6 +1154,34 @@ export class GameUi {
     button.setAttribute('aria-label', ready ? `プロトコルを再起動して最適化コアを${gain}個獲得` : `プロトコル再起動まで累計${format(REBOOT_THRESHOLD - state.totalClips)}クリップ`);
   }
 
+  private renderSurvey(state: GameState, format: (value: number) => string): void {
+    const panel = required<HTMLElement>(this.root, '#survey-panel');
+    panel.hidden = !isSurveyUnlocked(state);
+    this.surveyPanelCount.textContent = String(state.surveysRecovered);
+    const now = Date.now();
+    const rate = productionPerSecond(state);
+    for (const survey of SURVEYS) {
+      const card = required<HTMLElement>(panel, `[data-survey-card="${survey.id}"]`);
+      const status = surveyStatus(state, survey.id, now);
+      const cost = surveyCost(survey.id, rate);
+      const reward = surveyReward(survey.id, rate);
+      card.dataset.status = status;
+      required<HTMLElement>(card, '[data-survey-status]').textContent = status === 'idle' ? 'STANDBY' : status === 'outbound' ? 'OUTBOUND' : 'READY';
+      required<HTMLElement>(card, '[data-survey-time]').textContent = status === 'outbound'
+        ? this.formatCountdown((state.surveyReturnsAt[survey.id] - now) / 1000)
+        : `${survey.durationSeconds}秒`;
+      required<HTMLElement>(card, '[data-survey-price]').textContent = status === 'ready' ? `+${format(reward)} clips` : `${format(cost)} clips`;
+      const launch = required<HTMLButtonElement>(card, '[data-launch-survey]');
+      const collect = required<HTMLButtonElement>(card, '[data-collect-survey]');
+      launch.hidden = status !== 'idle';
+      collect.hidden = status === 'idle';
+      launch.disabled = status !== 'idle' || state.clips + Number.EPSILON < cost;
+      collect.disabled = status !== 'ready';
+      launch.setAttribute('aria-label', `${survey.name}を${format(cost)}クリップで出航`);
+      collect.setAttribute('aria-label', status === 'ready' ? `${survey.name}の帰還を回収` : `${survey.name}、出航中`);
+    }
+  }
+
   private bindEvents(): void {
     this.makeButton.addEventListener('click', this.actions.makeClip);
     this.bonusEvent.addEventListener('click', this.actions.collectBonusEvent);
@@ -1153,6 +1191,12 @@ export class GameUi {
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-claim-directive]')) {
       button.addEventListener('click', () => this.actions.claimDirective(button.dataset.claimDirective as DirectiveId));
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-launch-survey]')) {
+      button.addEventListener('click', () => this.actions.launchSurvey(button.dataset.launchSurvey as SurveyId));
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-collect-survey]')) {
+      button.addEventListener('click', () => this.actions.collectSurvey(button.dataset.collectSurvey as SurveyId));
     }
     this.autoBulkOn.addEventListener('click', () => this.actions.setAllAutoBuy(true));
     this.autoBulkOff.addEventListener('click', () => this.actions.setAllAutoBuy(false));
@@ -1261,6 +1305,11 @@ export class GameUi {
   private directivePanelTemplate(): string {
     const cards = DIRECTIVES.map((directive) => `<article class="directive-card" data-directive-card="${directive.id}"><div class="directive-card__head"><code>${directive.code}</code><span data-directive-status>RUNNING</span></div><div class="directive-card__title"><div><h3>${directive.name}</h3><p>${directive.description}</p></div><small data-directive-rank>RANK 0</small></div><div class="directive-card__numbers"><strong data-directive-progress>0 / 1</strong><span data-directive-reward>+0 clips</span></div><div class="directive-card__track" role="progressbar" aria-label="${directive.name}の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-directive-bar></span></div><button type="button" data-claim-directive="${directive.id}" disabled><span>報酬受領</span><small>CLAIM REWARD</small></button></article>`).join('');
     return `<section id="directive-panel" class="panel directive-panel" hidden><div class="section-heading"><div><span class="eyebrow">DIRECTIVE QUEUE</span><h2>最適化指令</h2></div><span id="directive-queue-status" class="section-code">MONITORING</span></div><p class="directive-panel__intro">通常作業を短期目標へ変換し、完了報酬を再投資する。</p><div class="directive-grid">${cards}</div></section>`;
+  }
+
+  private surveyPanelTemplate(): string {
+    const cards = SURVEYS.map((survey) => `<article class="survey-card" data-survey-card="${survey.id}" data-status="idle"><div class="survey-card__head"><code>${survey.code}</code><span data-survey-status>STANDBY</span></div><div class="survey-card__radar" aria-hidden="true"></div><h3>${survey.name}</h3><p>${survey.description}</p><div class="survey-card__meta"><strong data-survey-time>${survey.durationSeconds}秒</strong><small data-survey-price>-- clips</small></div><button type="button" data-launch-survey="${survey.id}"><span>出航</span><small>LAUNCH PROBE</small></button><button type="button" data-collect-survey="${survey.id}" hidden><span>回収</span><small>RECOVER SIGNAL</small></button></article>`).join('');
+    return `<section id="survey-panel" class="panel survey-panel" hidden><div class="section-heading"><div><span class="eyebrow">HORIZON SURVEY</span><h2>地平外探査</h2></div><span class="section-code">RECOVERED <strong id="survey-panel-count">0</strong></span></div><p class="survey-panel__intro">探査機を送り、戻ってきた観測をクリップへ変換する。</p><div class="survey-grid">${cards}</div></section>`;
   }
 
   private rebootPanelTemplate(): string {

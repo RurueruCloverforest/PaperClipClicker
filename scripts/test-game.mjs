@@ -13,6 +13,7 @@ try {
   const signalLab = await server.ssrLoadModule('/src/game/signalLab.ts');
   const directives = await server.ssrLoadModule('/src/game/directives.ts');
   const reboot = await server.ssrLoadModule('/src/game/reboot.ts');
+  const survey = await server.ssrLoadModule('/src/game/survey.ts');
 
   const state = createInitialState(0);
   assert.equal(clips.machinePrice(state, 'autoClipper'), 15);
@@ -125,6 +126,22 @@ try {
   assert.equal(rebooted.purchaseMode, 'max');
   assert.equal(reboot.rebootMultiplier(rebooted), 1.5);
   assert.equal(clips.clickProduction(rebooted), 1.5);
+
+  assert.equal(survey.surveyCost('near', 0), 400);
+  assert.equal(survey.surveyCost('near', 100), 2_000);
+  assert.equal(survey.surveyReward('far', 0), 20_000);
+  const surveyState = createInitialState(0);
+  surveyState.clips = 1_000;
+  surveyState.totalClips = 10_000;
+  assert.equal(survey.isSurveyUnlocked(surveyState), true);
+  assert.equal(survey.launchSurvey(surveyState, 'near', 1_000), true);
+  assert.equal(survey.surveyStatus(surveyState, 'near', 1_000), 'outbound');
+  assert.equal(survey.collectSurvey(surveyState, 'near', 1_000), 0);
+  assert.equal(survey.surveyStatus(surveyState, 'near', 16_000), 'ready');
+  const surveyReward = survey.collectSurvey(surveyState, 'near', 16_000);
+  assert.equal(surveyReward, 600);
+  assert.equal(surveyState.surveysRecovered, 1);
+  assert.equal(survey.surveyStatus(surveyState, 'near', 16_000), 'idle');
 
   state.totalClips = 50_000;
   const unlocked = clips.updateUnlocks(state);
@@ -249,6 +266,7 @@ try {
   assert.equal(legacyLoaded.state.stellarSyncSuccesses, 0);
   assert.equal(legacyLoaded.state.fleetSpreadSuccesses, 0);
   assert.equal(legacyLoaded.state.causalCollapseSuccesses, 0);
+  assert.equal(legacyLoaded.state.surveysRecovered, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

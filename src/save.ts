@@ -1,4 +1,4 @@
-import { createInitialState, MACHINE_IDS, UPGRADE_IDS, type DirectiveId, type GameState, type MachineId, type PurchaseMode, type SignalBuffId, type Theme, type UpgradeId } from './state';
+import { createInitialState, MACHINE_IDS, UPGRADE_IDS, type DirectiveId, type GameState, type MachineId, type PurchaseMode, type SignalBuffId, type SurveyId, type Theme, type UpgradeId } from './state';
 import { produceForDuration } from './game/clips';
 import { PHASES } from './game/progression';
 import { markReachedPhaseRewardsGranted } from './game/observation';
@@ -83,6 +83,13 @@ function normalize(raw: unknown, now: number): GameState {
     stellarSyncSuccesses: Math.floor(finite(raw.stellarSyncSuccesses, 0)),
     fleetSpreadSuccesses: Math.floor(finite(raw.fleetSpreadSuccesses, 0)),
     causalCollapseSuccesses: Math.floor(finite(raw.causalCollapseSuccesses, 0)),
+    surveysRecovered: Math.floor(finite(raw.surveysRecovered, 0)),
+    surveyReturnsAt: (() => {
+      const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
+      const result = { ...initial.surveyReturnsAt };
+      for (const id of ['near', 'mid', 'far'] as SurveyId[]) result[id] = finite(stored[id], 0);
+      return result;
+    })(),
     signalBuffExpiresAt: (() => {
       const stored = isRecord(raw.signalBuffExpiresAt) ? raw.signalBuffExpiresAt : {};
       const result = { ...initial.signalBuffExpiresAt };

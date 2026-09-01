@@ -4,6 +4,7 @@ export type UpgradeId = 'preciseFingers' | 'reinforcedLever' | 'qualityCutter' |
 export type PurchaseMode = 1 | 10 | 'max';
 export type SignalBuffId = 'productionSurge' | 'precisionAssist' | 'signalBeacon';
 export type DirectiveId = 'manualCalibration' | 'procurementOrder' | 'signalCapture';
+export type SurveyId = 'near' | 'mid' | 'far';
 
 export interface GameSettings {
   theme: Theme;
@@ -38,6 +39,8 @@ export interface GameState {
   stellarSyncSuccesses: number;
   fleetSpreadSuccesses: number;
   causalCollapseSuccesses: number;
+  surveysRecovered: number;
+  surveyReturnsAt: Record<SurveyId, number>;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -77,6 +80,8 @@ export function createInitialState(now = Date.now()): GameState {
     stellarSyncSuccesses: 0,
     fleetSpreadSuccesses: 0,
     causalCollapseSuccesses: 0,
+    surveysRecovered: 0,
+    surveyReturnsAt: { near: 0, mid: 0, far: 0 },
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

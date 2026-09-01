@@ -1,5 +1,5 @@
 import './style.css';
-import { createInitialState, MACHINE_IDS, type DirectiveId, type GameState, type MachineId, type SignalBuffId, type Theme, type UpgradeId } from './state';
+import { createInitialState, MACHINE_IDS, type DirectiveId, type GameState, type MachineId, type SignalBuffId, type SurveyId, type Theme, type UpgradeId } from './state';
 import { autoBuyTick, buyMachines, buyUpgrade, produceByClick, produceForDuration, productionPerSecond, updateUnlocks } from './game/clips';
 import { getMachine, getUpgrade } from './game/definitions';
 import { GameLoop } from './game/loop';
@@ -14,6 +14,7 @@ import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_CO
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
+import { SURVEYS, collectSurvey as recoverSurvey, launchSurvey as sendSurvey } from './game/survey';
 
 const app = document.querySelector<HTMLElement>('#app');
 if (!app) throw new Error('App root not found');
@@ -507,6 +508,26 @@ const ui = new GameUi(app, {
     const message = `${directive.name}完了：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
     ui.announce(message, 'success');
     ui.addLog('ORDER', message);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  },
+  launchSurvey: (id) => {
+    const survey = SURVEYS.find((item) => item.id === id)!;
+    if (!sendSurvey(state, id)) return;
+    const message = `${survey.name}を出航：${survey.durationSeconds}秒`;
+    ui.announce(message, 'success');
+    ui.addLog('PROBE', message);
+    ui.render(state, true);
+    saveGame(state);
+  },
+  collectSurvey: (id) => {
+    const survey = SURVEYS.find((item) => item.id === id)!;
+    const reward = recoverSurvey(state, id);
+    if (reward <= 0) return;
+    const message = `${survey.name}帰還：+${Math.floor(reward).toLocaleString('ja-JP')}クリップ`;
+    ui.announce(message, 'success');
+    ui.addLog('PROBE', message);
     updateProgressionEvents();
     ui.render(state, true);
     saveGame(state);
