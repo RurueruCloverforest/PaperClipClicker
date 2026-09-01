@@ -297,3 +297,45 @@ export function applyMatterCompileReward(state: GameState, successes: number): n
   state.matterCompileSuccesses += safeSuccesses;
   return amount;
 }
+
+export const PLANET_INTERIOR: MachineId = 'planetaryAssembler';
+export const PLANET_ROUNDS = 4;
+export const PLANET_QUADS = 4;
+export const PLANET_LENGTHS = [3, 4, 4, 5] as const;
+export const PLANET_COOLDOWN_MS = 60_000;
+export const PLANET_RESULT_MS = 700;
+export type PlanetQuad = 0 | 1 | 2 | 3;
+export const PLANET_QUAD_IDS: PlanetQuad[] = [0, 1, 2, 3];
+
+export function planetOrderLength(round: number): number {
+  return PLANET_LENGTHS[Math.min(Math.max(Math.floor(round), 1), PLANET_ROUNDS) - 1] ?? PLANET_LENGTHS[0];
+}
+
+export function randomPlanetOrder(length: number, random = Math.random): PlanetQuad[] {
+  const order: PlanetQuad[] = [];
+  const safeLength = Math.max(1, Math.floor(length));
+  for (let index = 0; index < safeLength; index += 1) {
+    const previous = order.at(-1);
+    const options = PLANET_QUAD_IDS.filter((quad) => quad !== previous);
+    const pick = Math.floor(Math.max(0, Math.min(0.999999, random())) * options.length);
+    order.push(options[pick]!);
+  }
+  return order;
+}
+
+export function isPlanetStepCorrect(order: PlanetQuad[], index: number, choice: PlanetQuad): boolean {
+  return order[index] === choice;
+}
+
+export function planetStripUnitReward(state: GameState): number {
+  return Math.max(3_000, productionPerSecond(state) * 125, clickProduction(state) * 300);
+}
+
+export function applyPlanetStripReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(PLANET_ROUNDS, Math.floor(successes)));
+  const amount = planetStripUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.planetStripSuccesses += safeSuccesses;
+  return amount;
+}

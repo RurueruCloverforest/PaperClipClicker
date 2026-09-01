@@ -245,6 +245,7 @@ try {
   assert.equal(legacyLoaded.state.swarmSyncSuccesses, 0);
   assert.equal(legacyLoaded.state.orbitalBerthSuccesses, 0);
   assert.equal(legacyLoaded.state.matterCompileSuccesses, 0);
+  assert.equal(legacyLoaded.state.planetStripSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -348,6 +349,18 @@ try {
   assert.equal(matterReward, 7_500);
   assert.equal(matterState.matterCompileSuccesses, 3);
   assert.equal(matterState.clips, 7_500);
+  assert.equal(interior.planetOrderLength(1), 3);
+  assert.equal(interior.planetOrderLength(4), 5);
+  const planetOrder = interior.randomPlanetOrder(4, () => 0);
+  assert.deepEqual(planetOrder, [0, 1, 0, 1]);
+  assert.equal(planetOrder.every((quad, index) => index === 0 || quad !== planetOrder[index - 1]), true);
+  assert.equal(interior.isPlanetStepCorrect(planetOrder, 0, 0), true);
+  assert.equal(interior.isPlanetStepCorrect(planetOrder, 1, 0), false);
+  const planetState = createInitialState(0);
+  const planetReward = interior.applyPlanetStripReward(planetState, 3);
+  assert.equal(planetReward, 9_000);
+  assert.equal(planetState.planetStripSuccesses, 3);
+  assert.equal(planetState.clips, 9_000);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 

@@ -79,6 +79,7 @@ function normalize(raw: unknown, now: number): GameState {
     swarmSyncSuccesses: Math.floor(finite(raw.swarmSyncSuccesses, 0)),
     orbitalBerthSuccesses: Math.floor(finite(raw.orbitalBerthSuccesses, 0)),
     matterCompileSuccesses: Math.floor(finite(raw.matterCompileSuccesses, 0)),
+    planetStripSuccesses: Math.floor(finite(raw.planetStripSuccesses, 0)),
     signalBuffExpiresAt: (() => {
       const stored = isRecord(raw.signalBuffExpiresAt) ? raw.signalBuffExpiresAt : {};
       const result = { ...initial.signalBuffExpiresAt };

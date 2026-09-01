@@ -10,7 +10,7 @@ import { grantDuePhaseRewards } from './game/observation';
 import { crossedMilestones } from './game/milestones';
 import { ACHIEVEMENTS, unlockedAchievementIds } from './game/achievements';
 import { applyBonusReward, applyPrecisionReward, chooseBonusOutcome, nextBonusDelay, nextPrecisionDelay, precisionClickTarget, precisionPosition } from './game/bonusEvents';
-import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyOrbitalBerthReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isOrbitalBerthSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, randomMatterBoard, randomNanoWaste, randomOrbitalBlocked, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type TraceNodeId } from './game/interior';
+import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
@@ -106,6 +106,17 @@ let matterResults: boolean[] = [];
 let matterPhase: 'play' | 'result' | 'cooldown' = 'play';
 let matterNextRoundAt = 0;
 let matterCooldownUntil = 0;
+let planetRound = 1;
+let planetSuccesses = 0;
+let planetAttempts = 0;
+let planetOrder: PlanetQuad[] = [];
+let planetStep = 0;
+let planetLast: number | null = null;
+let planetFault: number | null = null;
+let planetResults: boolean[] = [];
+let planetPhase: 'play' | 'result' | 'cooldown' = 'play';
+let planetNextRoundAt = 0;
+let planetCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 
 function prefersReducedMotion(): boolean {
@@ -245,6 +256,50 @@ function beginMatterRound(): void {
   matterPhase = 'play';
   matterNextRoundAt = 0;
   renderMatterConsole('PAIR · 同じ署名を束ねる', false);
+}
+
+function renderPlanetConsole(message = '表示された順路どおりに象限を剥がしてください', disabled = planetPhase !== 'play' || performance.now() < planetCooldownUntil): void {
+  const waiting = performance.now() < planetCooldownUntil;
+  ui.setPlanetStrip(
+    planetRound,
+    planetSuccesses,
+    planetOrder,
+    planetStep,
+    planetLast,
+    planetFault,
+    planetResults,
+    waiting ? 'cooldown' : planetPhase,
+    message,
+    disabled,
+  );
+}
+
+function beginPlanetRound(): void {
+  planetOrder = randomPlanetOrder(planetOrderLength(planetRound));
+  planetStep = 0;
+  planetLast = null;
+  planetFault = null;
+  planetPhase = 'play';
+  planetNextRoundAt = 0;
+  renderPlanetConsole(`STRIP · 次は ${['N', 'E', 'S', 'W'][planetOrder[0] ?? 0]}`, false);
+}
+
+function finishPlanetRound(now: number): void {
+  if (planetAttempts >= PLANET_ROUNDS) {
+    const reward = applyPlanetStripReward(state, planetSuccesses);
+    planetCooldownUntil = now + PLANET_COOLDOWN_MS;
+    planetPhase = 'cooldown';
+    const message = `採掘オーダー：${planetSuccesses} / ${PLANET_ROUNDS}成功${reward > 0 ? ` +${Math.floor(reward).toLocaleString('ja-JP')}クリップ` : ''}`;
+    ui.setInteriorStatus(message);
+    ui.announce(message, planetSuccesses > 0 ? 'success' : 'warning');
+    ui.addLog('CRUST', message);
+    renderPlanetConsole('STANDBY · 再採掘待機', true);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  } else {
+    planetNextRoundAt = now + PLANET_RESULT_MS;
+  }
 }
 
 function finishMatterRound(now: number, success: boolean): void {
@@ -469,6 +524,18 @@ const ui = new GameUi(app, {
       matterPhase = now < matterCooldownUntil ? 'cooldown' : 'play';
       if (now < matterCooldownUntil) renderMatterConsole(`再変換待機 · 残り${Math.ceil((matterCooldownUntil - now) / 1000)}秒`, true);
       else beginMatterRound();
+    } else if (id === PLANET_INTERIOR) {
+      planetRound = 1;
+      planetSuccesses = 0;
+      planetAttempts = 0;
+      planetResults = [];
+      planetOrder = [];
+      planetStep = 0;
+      planetLast = null;
+      planetFault = null;
+      planetPhase = now < planetCooldownUntil ? 'cooldown' : 'play';
+      if (now < planetCooldownUntil) renderPlanetConsole(`再採掘待機 · 残り${Math.ceil((planetCooldownUntil - now) / 1000)}秒`, true);
+      else beginPlanetRound();
     }
   },
   closeInterior: () => {
@@ -488,6 +555,7 @@ const ui = new GameUi(app, {
     if (interiorMachine === SWARM_INTERIOR && swarmAttempts > 0 && swarmAttempts < SWARM_ROUNDS) swarmCooldownUntil = performance.now() + SWARM_COOLDOWN_MS;
     if (interiorMachine === ORBITAL_INTERIOR && orbitalAttempts > 0 && orbitalAttempts < ORBITAL_ROUNDS) orbitalCooldownUntil = performance.now() + ORBITAL_COOLDOWN_MS;
     if (interiorMachine === MATTER_INTERIOR && matterAttempts > 0 && matterAttempts < MATTER_ROUNDS) matterCooldownUntil = performance.now() + MATTER_COOLDOWN_MS;
+    if (interiorMachine === PLANET_INTERIOR && planetAttempts > 0 && planetAttempts < PLANET_ROUNDS) planetCooldownUntil = performance.now() + PLANET_COOLDOWN_MS;
     interiorMachine = null;
     interiorSessionHarvests = 0;
     interiorSessionAmount = 0;
@@ -725,6 +793,31 @@ const ui = new GameUi(app, {
     matterPhase = 'result';
     finishMatterRound(now, false);
   },
+  stripPlanetQuad: (index) => {
+    const now = performance.now();
+    if (interiorMachine !== PLANET_INTERIOR || now < planetCooldownUntil || planetPhase !== 'play' || planetAttempts >= PLANET_ROUNDS) return;
+    if (!isPlanetStepCorrect(planetOrder, planetStep, index)) {
+      planetFault = index;
+      planetResults.push(false);
+      planetAttempts += 1;
+      planetPhase = 'result';
+      renderPlanetConsole('FAULT · 順路から外れた', true);
+      finishPlanetRound(now);
+      return;
+    }
+    planetLast = index;
+    planetStep += 1;
+    if (planetStep < planetOrder.length) {
+      renderPlanetConsole(`STRIP · 次は ${['N', 'E', 'S', 'W'][planetOrder[planetStep] ?? 0]}`, false);
+      return;
+    }
+    planetResults.push(true);
+    planetSuccesses += 1;
+    planetAttempts += 1;
+    planetPhase = 'result';
+    renderPlanetConsole('CLEARED · 地殻を剥離', true);
+    finishPlanetRound(now);
+  },
   changePurchaseMode: (mode) => {
     state.purchaseMode = mode;
     ui.addLog('MODE', `購入数量を${mode === 'max' ? 'MAX' : `×${mode}`}へ変更`);
@@ -768,6 +861,7 @@ const ui = new GameUi(app, {
     swarmCooldownUntil = 0;
     orbitalCooldownUntil = 0;
     matterCooldownUntil = 0;
+    planetCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -806,6 +900,7 @@ const ui = new GameUi(app, {
     swarmCooldownUntil = 0;
     orbitalCooldownUntil = 0;
     matterCooldownUntil = 0;
+    planetCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1071,6 +1166,20 @@ const loop = new GameLoop((elapsedSeconds) => {
     } else if (matterPhase === 'result' && matterNextRoundAt > 0 && now >= matterNextRoundAt) {
       matterRound += 1;
       beginMatterRound();
+    }
+  }
+  if (interiorMachine === PLANET_INTERIOR) {
+    if (now < planetCooldownUntil) {
+      renderPlanetConsole(`再採掘待機 · 残り${Math.ceil((planetCooldownUntil - now) / 1000)}秒`, true);
+    } else if (planetPhase === 'cooldown') {
+      planetRound = 1;
+      planetSuccesses = 0;
+      planetAttempts = 0;
+      planetResults = [];
+      beginPlanetRound();
+    } else if (planetPhase === 'result' && planetNextRoundAt > 0 && now >= planetNextRoundAt) {
+      planetRound += 1;
+      beginPlanetRound();
     }
   }
   ui.render(state);
