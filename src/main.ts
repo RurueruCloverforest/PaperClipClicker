@@ -10,7 +10,7 @@ import { grantDuePhaseRewards } from './game/observation';
 import { crossedMilestones } from './game/milestones';
 import { ACHIEVEMENTS, unlockedAchievementIds } from './game/achievements';
 import { applyBonusReward, applyPrecisionReward, chooseBonusOutcome, nextBonusDelay, nextPrecisionDelay, precisionClickTarget, precisionPosition } from './game/bonusEvents';
-import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, STELLAR_COOLDOWN_MS, STELLAR_INTERIOR, STELLAR_PETALS, STELLAR_RESULT_MS, STELLAR_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applyStellarSyncReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isStellarSyncSuccess, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomStellarMask, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
+import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, STELLAR_COOLDOWN_MS, STELLAR_INTERIOR, STELLAR_PETALS, STELLAR_RESULT_MS, STELLAR_ROUNDS, FLEET_CELLS, FLEET_COOLDOWN_MS, FLEET_INTERIOR, FLEET_RESULT_MS, FLEET_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applyStellarSyncReward, applyFleetSpreadReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isStellarSyncSuccess, isFleetSpreadSuccess, canClaimFleetCell, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomStellarMask, randomFleetSeed, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
@@ -126,6 +126,16 @@ let stellarResults: boolean[] = [];
 let stellarPhase: 'play' | 'result' | 'cooldown' = 'play';
 let stellarNextRoundAt = 0;
 let stellarCooldownUntil = 0;
+let fleetRound = 1;
+let fleetSuccesses = 0;
+let fleetAttempts = 0;
+let fleetSeed = 0;
+let fleetOwned = Array.from({ length: FLEET_CELLS }, () => false);
+let fleetFault: number | null = null;
+let fleetResults: boolean[] = [];
+let fleetPhase: 'play' | 'result' | 'cooldown' = 'play';
+let fleetNextRoundAt = 0;
+let fleetCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 
 function prefersReducedMotion(): boolean {
@@ -313,6 +323,50 @@ function beginStellarRound(): void {
   stellarPhase = 'play';
   stellarNextRoundAt = 0;
   renderStellarConsole(`ALIGN · ${stellarTarget.filter(Boolean).length}枚を開放`, false);
+}
+
+function renderFleetConsole(message = '隣接する空き星域へ複製してください', disabled = fleetPhase !== 'play' || performance.now() < fleetCooldownUntil): void {
+  const waiting = performance.now() < fleetCooldownUntil;
+  ui.setFleetSpread(
+    fleetRound,
+    fleetSuccesses,
+    fleetSeed,
+    fleetOwned,
+    fleetFault,
+    fleetResults,
+    waiting ? 'cooldown' : fleetPhase,
+    message,
+    disabled,
+  );
+}
+
+function beginFleetRound(): void {
+  fleetSeed = randomFleetSeed();
+  fleetOwned = Array.from({ length: FLEET_CELLS }, () => false);
+  fleetOwned[fleetSeed] = true;
+  fleetFault = null;
+  fleetPhase = 'play';
+  fleetNextRoundAt = 0;
+  renderFleetConsole('SPREAD · 隣接星域へ複製', false);
+}
+
+function finishFleetRound(now: number, success: boolean): void {
+  renderFleetConsole(success ? 'LINKED · 銀河へ展開' : 'ISOLATE · 隣接していない', true);
+  if (fleetAttempts >= FLEET_ROUNDS) {
+    const reward = applyFleetSpreadReward(state, fleetSuccesses);
+    fleetCooldownUntil = now + FLEET_COOLDOWN_MS;
+    fleetPhase = 'cooldown';
+    const message = `複製展開：${fleetSuccesses} / ${FLEET_ROUNDS}成功${reward > 0 ? ` +${Math.floor(reward).toLocaleString('ja-JP')}クリップ` : ''}`;
+    ui.setInteriorStatus(message);
+    ui.announce(message, fleetSuccesses > 0 ? 'success' : 'warning');
+    ui.addLog('FLEET', message);
+    renderFleetConsole('STANDBY · 再展開待機', true);
+    updateProgressionEvents();
+    ui.render(state, true);
+    saveGame(state);
+  } else {
+    fleetNextRoundAt = now + FLEET_RESULT_MS;
+  }
 }
 
 function finishPlanetRound(now: number): void {
@@ -577,6 +631,17 @@ const ui = new GameUi(app, {
       stellarPhase = now < stellarCooldownUntil ? 'cooldown' : 'play';
       if (now < stellarCooldownUntil) renderStellarConsole(`再同調待機 · 残り${Math.ceil((stellarCooldownUntil - now) / 1000)}秒`, true);
       else beginStellarRound();
+    } else if (id === FLEET_INTERIOR) {
+      fleetRound = 1;
+      fleetSuccesses = 0;
+      fleetAttempts = 0;
+      fleetResults = [];
+      fleetOwned = Array.from({ length: FLEET_CELLS }, () => false);
+      fleetFault = null;
+      fleetSeed = 0;
+      fleetPhase = now < fleetCooldownUntil ? 'cooldown' : 'play';
+      if (now < fleetCooldownUntil) renderFleetConsole(`再展開待機 · 残り${Math.ceil((fleetCooldownUntil - now) / 1000)}秒`, true);
+      else beginFleetRound();
     }
   },
   closeInterior: () => {
@@ -598,6 +663,7 @@ const ui = new GameUi(app, {
     if (interiorMachine === MATTER_INTERIOR && matterAttempts > 0 && matterAttempts < MATTER_ROUNDS) matterCooldownUntil = performance.now() + MATTER_COOLDOWN_MS;
     if (interiorMachine === PLANET_INTERIOR && planetAttempts > 0 && planetAttempts < PLANET_ROUNDS) planetCooldownUntil = performance.now() + PLANET_COOLDOWN_MS;
     if (interiorMachine === STELLAR_INTERIOR && stellarAttempts > 0 && stellarAttempts < STELLAR_ROUNDS) stellarCooldownUntil = performance.now() + STELLAR_COOLDOWN_MS;
+    if (interiorMachine === FLEET_INTERIOR && fleetAttempts > 0 && fleetAttempts < FLEET_ROUNDS) fleetCooldownUntil = performance.now() + FLEET_COOLDOWN_MS;
     interiorMachine = null;
     interiorSessionHarvests = 0;
     interiorSessionAmount = 0;
@@ -892,6 +958,29 @@ const ui = new GameUi(app, {
       stellarNextRoundAt = now + STELLAR_RESULT_MS;
     }
   },
+  claimFleetCell: (index) => {
+    const now = performance.now();
+    if (interiorMachine !== FLEET_INTERIOR || now < fleetCooldownUntil || fleetPhase !== 'play' || fleetAttempts >= FLEET_ROUNDS) return;
+    if (index < 0 || index >= FLEET_CELLS || fleetOwned[index] || fleetFault !== null) return;
+    if (!canClaimFleetCell(fleetOwned, index)) {
+      fleetFault = index;
+      fleetResults.push(false);
+      fleetAttempts += 1;
+      fleetPhase = 'result';
+      finishFleetRound(now, false);
+      return;
+    }
+    fleetOwned[index] = true;
+    if (!isFleetSpreadSuccess(fleetOwned)) {
+      renderFleetConsole(`SPREAD · LINK ${fleetOwned.filter(Boolean).length} / 9`, false);
+      return;
+    }
+    fleetResults.push(true);
+    fleetSuccesses += 1;
+    fleetAttempts += 1;
+    fleetPhase = 'result';
+    finishFleetRound(now, true);
+  },
   changePurchaseMode: (mode) => {
     state.purchaseMode = mode;
     ui.addLog('MODE', `購入数量を${mode === 'max' ? 'MAX' : `×${mode}`}へ変更`);
@@ -937,6 +1026,7 @@ const ui = new GameUi(app, {
     matterCooldownUntil = 0;
     planetCooldownUntil = 0;
     stellarCooldownUntil = 0;
+    fleetCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -977,6 +1067,7 @@ const ui = new GameUi(app, {
     matterCooldownUntil = 0;
     planetCooldownUntil = 0;
     stellarCooldownUntil = 0;
+    fleetCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1270,6 +1361,20 @@ const loop = new GameLoop((elapsedSeconds) => {
     } else if (stellarPhase === 'result' && stellarNextRoundAt > 0 && now >= stellarNextRoundAt) {
       stellarRound += 1;
       beginStellarRound();
+    }
+  }
+  if (interiorMachine === FLEET_INTERIOR) {
+    if (now < fleetCooldownUntil) {
+      renderFleetConsole(`再展開待機 · 残り${Math.ceil((fleetCooldownUntil - now) / 1000)}秒`, true);
+    } else if (fleetPhase === 'cooldown') {
+      fleetRound = 1;
+      fleetSuccesses = 0;
+      fleetAttempts = 0;
+      fleetResults = [];
+      beginFleetRound();
+    } else if (fleetPhase === 'result' && fleetNextRoundAt > 0 && now >= fleetNextRoundAt) {
+      fleetRound += 1;
+      beginFleetRound();
     }
   }
   ui.render(state);

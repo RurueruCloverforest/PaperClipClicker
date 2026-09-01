@@ -374,3 +374,46 @@ export function applyStellarSyncReward(state: GameState, successes: number): num
   state.stellarSyncSuccesses += safeSuccesses;
   return amount;
 }
+
+export const FLEET_INTERIOR: MachineId = 'galacticFleet';
+export const FLEET_ROUNDS = 4;
+export const FLEET_CELLS = 9;
+export const FLEET_COOLDOWN_MS = 60_000;
+export const FLEET_RESULT_MS = 700;
+
+export function randomFleetSeed(random = Math.random): number {
+  return Math.floor(Math.max(0, Math.min(0.999999, random())) * FLEET_CELLS);
+}
+
+export function fleetNeighbors(index: number): number[] {
+  const row = Math.floor(index / 3);
+  const col = index % 3;
+  const neighbors: number[] = [];
+  if (row > 0) neighbors.push(index - 3);
+  if (row < 2) neighbors.push(index + 3);
+  if (col > 0) neighbors.push(index - 1);
+  if (col < 2) neighbors.push(index + 1);
+  return neighbors;
+}
+
+export function canClaimFleetCell(owned: boolean[], index: number): boolean {
+  if (index < 0 || index >= FLEET_CELLS || owned[index]) return false;
+  return fleetNeighbors(index).some((neighbor) => owned[neighbor] === true);
+}
+
+export function isFleetSpreadSuccess(owned: boolean[]): boolean {
+  return owned.length >= FLEET_CELLS && owned.slice(0, FLEET_CELLS).every(Boolean);
+}
+
+export function fleetSpreadUnitReward(state: GameState): number {
+  return Math.max(4_000, productionPerSecond(state) * 155, clickProduction(state) * 380);
+}
+
+export function applyFleetSpreadReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(FLEET_ROUNDS, Math.floor(successes)));
+  const amount = fleetSpreadUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.fleetSpreadSuccesses += safeSuccesses;
+  return amount;
+}

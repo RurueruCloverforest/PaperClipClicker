@@ -247,6 +247,7 @@ try {
   assert.equal(legacyLoaded.state.matterCompileSuccesses, 0);
   assert.equal(legacyLoaded.state.planetStripSuccesses, 0);
   assert.equal(legacyLoaded.state.stellarSyncSuccesses, 0);
+  assert.equal(legacyLoaded.state.fleetSpreadSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -372,6 +373,20 @@ try {
   assert.equal(stellarReward, 10_500);
   assert.equal(stellarState.stellarSyncSuccesses, 3);
   assert.equal(stellarState.clips, 10_500);
+  assert.equal(interior.randomFleetSeed(() => 0), 0);
+  assert.deepEqual(interior.fleetNeighbors(0), [3, 1]);
+  assert.deepEqual(interior.fleetNeighbors(4), [1, 7, 3, 5]);
+  const fleetOwned = Array.from({ length: 9 }, () => false);
+  fleetOwned[0] = true;
+  assert.equal(interior.canClaimFleetCell(fleetOwned, 1), true);
+  assert.equal(interior.canClaimFleetCell(fleetOwned, 2), false);
+  assert.equal(interior.canClaimFleetCell(fleetOwned, 0), false);
+  assert.equal(interior.isFleetSpreadSuccess(Array.from({ length: 9 }, () => true)), true);
+  const fleetState = createInitialState(0);
+  const fleetReward = interior.applyFleetSpreadReward(fleetState, 3);
+  assert.equal(fleetReward, 12_000);
+  assert.equal(fleetState.fleetSpreadSuccesses, 3);
+  assert.equal(fleetState.clips, 12_000);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 
