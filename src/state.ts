@@ -37,6 +37,7 @@ export interface GameState {
   planetStripSuccesses: number;
   stellarSyncSuccesses: number;
   fleetSpreadSuccesses: number;
+  causalCollapseSuccesses: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -75,6 +76,7 @@ export function createInitialState(now = Date.now()): GameState {
     planetStripSuccesses: 0,
     stellarSyncSuccesses: 0,
     fleetSpreadSuccesses: 0,
+    causalCollapseSuccesses: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

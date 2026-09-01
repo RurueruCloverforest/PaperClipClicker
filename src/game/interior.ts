@@ -417,3 +417,51 @@ export function applyFleetSpreadReward(state: GameState, successes: number): num
   state.fleetSpreadSuccesses += safeSuccesses;
   return amount;
 }
+
+export const CAUSAL_INTERIOR: MachineId = 'causalOptimizer';
+export const CAUSAL_ROUNDS = 4;
+export const CAUSAL_GAUGES = 4;
+export const CAUSAL_MOD = 4;
+export const CAUSAL_COOLDOWN_MS = 60_000;
+export const CAUSAL_RESULT_MS = 700;
+
+export function isCausalConverged(values: number[]): boolean {
+  if (values.length < CAUSAL_GAUGES) return false;
+  const first = values[0];
+  return values.slice(0, CAUSAL_GAUGES).every((value) => value === first);
+}
+
+export function causalSpan(values: number[]): number {
+  const slice = values.slice(0, CAUSAL_GAUGES);
+  if (slice.length === 0) return 0;
+  return Math.max(...slice) - Math.min(...slice);
+}
+
+export function randomCausalGauges(random = Math.random): number[] {
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const values = Array.from({ length: CAUSAL_GAUGES }, () => Math.floor(Math.max(0, Math.min(0.999999, random())) * CAUSAL_MOD));
+    if (!isCausalConverged(values)) return values;
+  }
+  return [0, 1, 2, 3];
+}
+
+export function incrementCausalGauge(values: number[], index: number): number[] {
+  const next = values.slice(0, CAUSAL_GAUGES);
+  while (next.length < CAUSAL_GAUGES) next.push(0);
+  if (index < 0 || index >= CAUSAL_GAUGES) return next;
+  next[index] = ((next[index] ?? 0) + 1) % CAUSAL_MOD;
+  return next;
+}
+
+export function causalCollapseUnitReward(state: GameState): number {
+  return Math.max(4_500, productionPerSecond(state) * 170, clickProduction(state) * 420);
+}
+
+export function applyCausalCollapseReward(state: GameState, successes: number): number {
+  const safeSuccesses = Math.max(0, Math.min(CAUSAL_ROUNDS, Math.floor(successes)));
+  const amount = causalCollapseUnitReward(state) * safeSuccesses;
+  state.clips += amount;
+  state.totalClips += amount;
+  state.causalCollapseSuccesses += safeSuccesses;
+  return amount;
+}

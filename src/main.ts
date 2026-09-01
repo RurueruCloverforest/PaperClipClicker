@@ -10,7 +10,7 @@ import { grantDuePhaseRewards } from './game/observation';
 import { crossedMilestones } from './game/milestones';
 import { ACHIEVEMENTS, unlockedAchievementIds } from './game/achievements';
 import { applyBonusReward, applyPrecisionReward, chooseBonusOutcome, nextBonusDelay, nextPrecisionDelay, precisionClickTarget, precisionPosition } from './game/bonusEvents';
-import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, STELLAR_COOLDOWN_MS, STELLAR_INTERIOR, STELLAR_PETALS, STELLAR_RESULT_MS, STELLAR_ROUNDS, FLEET_CELLS, FLEET_COOLDOWN_MS, FLEET_INTERIOR, FLEET_RESULT_MS, FLEET_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applyStellarSyncReward, applyFleetSpreadReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isStellarSyncSuccess, isFleetSpreadSuccess, canClaimFleetCell, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomStellarMask, randomFleetSeed, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
+import { FACTORY_COOLDOWN_MS, FACTORY_INSPECTIONS, FACTORY_INTERIOR, INTERIOR_COOLDOWN_MS, INTERIOR_MAX_LIVE, INTERIOR_SESSION_MS, INTERIOR_SPAWN_MS, MATTER_CELLS, MATTER_COOLDOWN_MS, MATTER_INTERIOR, MATTER_RESULT_MS, MATTER_ROUNDS, PLANET_COOLDOWN_MS, PLANET_INTERIOR, PLANET_RESULT_MS, PLANET_ROUNDS, STELLAR_COOLDOWN_MS, STELLAR_INTERIOR, STELLAR_PETALS, STELLAR_RESULT_MS, STELLAR_ROUNDS, FLEET_CELLS, FLEET_COOLDOWN_MS, FLEET_INTERIOR, FLEET_RESULT_MS, FLEET_ROUNDS, CAUSAL_COOLDOWN_MS, CAUSAL_GAUGES, CAUSAL_INTERIOR, CAUSAL_RESULT_MS, CAUSAL_ROUNDS, NANO_COOLDOWN_MS, NANO_INTERIOR, NANO_RESULT_MS, NANO_ROUNDS, NANO_WASTE, ORBITAL_COOLDOWN_MS, ORBITAL_DOCKS, ORBITAL_INTERIOR, ORBITAL_RESULT_MS, ORBITAL_ROUNDS, PLAYABLE_INTERIOR, SWARM_COOLDOWN_MS, SWARM_INTERIOR, SWARM_RESULT_MS, SWARM_ROUNDS, SWARM_UNITS, TRACE_COOLDOWN_MS, TRACE_INTERIOR, TRACE_LENGTHS, TRACE_REDUCED_OBSERVE_MS, TRACE_RESULT_MS, TRACE_ROUNDS, TRACE_STEP_MS, WIRE_COOLDOWN_MS, WIRE_INTERIOR, WIRE_ROUNDS, applyFactoryQualityReward, applyInteriorHarvest, applyMatterCompileReward, applyNanoPurgeReward, applyPlanetStripReward, applyOrbitalBerthReward, applyStellarSyncReward, applyFleetSpreadReward, applyCausalCollapseReward, applySwarmSyncReward, applyTraceReward, applyWireCalibrationReward, canOpenInterior, factoryInspectionBatch, isMatterPair, isMatterRoundSuccess, isNanoWasteCell, isPlanetStepCorrect, isOrbitalBerthSuccess, isStellarSyncSuccess, isFleetSpreadSuccess, canClaimFleetCell, causalSpan, incrementCausalGauge as stepCausalGauge, isCausalConverged, isSwarmSyncSuccess, isTraceStepCorrect, isWireCalibrationSuccess, matterPairsRemaining, orbitalTarget, randomInteriorPosition, planetOrderLength, randomMatterBoard, randomNanoWaste, randomPlanetOrder, randomOrbitalBlocked, randomStellarMask, randomFleetSeed, randomCausalGauges, randomTraceSequence, randomWireTarget, swarmTarget, wireTensionPosition, type FactoryQuality, type MatterKind, type PlanetQuad, type TraceNodeId } from './game/interior';
 import { SIGNAL_BUFFS, activateSignalBuff, activeSignalBuffs, precisionDuration, signalIntervalMultiplier } from './game/signalLab';
 import { DIRECTIVES, advanceDirective, claimDirective } from './game/directives';
 import { createRebootedState, rebootCoreGain } from './game/reboot';
@@ -136,6 +136,14 @@ let fleetResults: boolean[] = [];
 let fleetPhase: 'play' | 'result' | 'cooldown' = 'play';
 let fleetNextRoundAt = 0;
 let fleetCooldownUntil = 0;
+let causalRound = 1;
+let causalSuccesses = 0;
+let causalAttempts = 0;
+let causalValues = [0, 1, 2, 3];
+let causalResults: boolean[] = [];
+let causalPhase: 'play' | 'result' | 'cooldown' = 'play';
+let causalNextRoundAt = 0;
+let causalCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
 
 function prefersReducedMotion(): boolean {
@@ -348,6 +356,26 @@ function beginFleetRound(): void {
   fleetPhase = 'play';
   fleetNextRoundAt = 0;
   renderFleetConsole('SPREAD · 隣接星域へ複製', false);
+}
+
+function renderCausalConsole(message = '4本の指標を同じ値へ揃えて収束してください', disabled = causalPhase !== 'play' || performance.now() < causalCooldownUntil): void {
+  const waiting = performance.now() < causalCooldownUntil;
+  ui.setCausalCollapse(
+    causalRound,
+    causalSuccesses,
+    causalValues,
+    causalResults,
+    waiting ? 'cooldown' : causalPhase,
+    message,
+    disabled,
+  );
+}
+
+function beginCausalRound(): void {
+  causalValues = randomCausalGauges();
+  causalPhase = 'play';
+  causalNextRoundAt = 0;
+  renderCausalConsole(`DRIFT · SPAN ${causalSpan(causalValues)}`, false);
 }
 
 function finishFleetRound(now: number, success: boolean): void {
@@ -642,6 +670,15 @@ const ui = new GameUi(app, {
       fleetPhase = now < fleetCooldownUntil ? 'cooldown' : 'play';
       if (now < fleetCooldownUntil) renderFleetConsole(`再展開待機 · 残り${Math.ceil((fleetCooldownUntil - now) / 1000)}秒`, true);
       else beginFleetRound();
+    } else if (id === CAUSAL_INTERIOR) {
+      causalRound = 1;
+      causalSuccesses = 0;
+      causalAttempts = 0;
+      causalResults = [];
+      causalValues = Array.from({ length: CAUSAL_GAUGES }, (_, index) => index);
+      causalPhase = now < causalCooldownUntil ? 'cooldown' : 'play';
+      if (now < causalCooldownUntil) renderCausalConsole(`再収束待機 · 残り${Math.ceil((causalCooldownUntil - now) / 1000)}秒`, true);
+      else beginCausalRound();
     }
   },
   closeInterior: () => {
@@ -664,6 +701,7 @@ const ui = new GameUi(app, {
     if (interiorMachine === PLANET_INTERIOR && planetAttempts > 0 && planetAttempts < PLANET_ROUNDS) planetCooldownUntil = performance.now() + PLANET_COOLDOWN_MS;
     if (interiorMachine === STELLAR_INTERIOR && stellarAttempts > 0 && stellarAttempts < STELLAR_ROUNDS) stellarCooldownUntil = performance.now() + STELLAR_COOLDOWN_MS;
     if (interiorMachine === FLEET_INTERIOR && fleetAttempts > 0 && fleetAttempts < FLEET_ROUNDS) fleetCooldownUntil = performance.now() + FLEET_COOLDOWN_MS;
+    if (interiorMachine === CAUSAL_INTERIOR && causalAttempts > 0 && causalAttempts < CAUSAL_ROUNDS) causalCooldownUntil = performance.now() + CAUSAL_COOLDOWN_MS;
     interiorMachine = null;
     interiorSessionHarvests = 0;
     interiorSessionAmount = 0;
@@ -981,6 +1019,37 @@ const ui = new GameUi(app, {
     fleetPhase = 'result';
     finishFleetRound(now, true);
   },
+  incrementCausalGauge: (index) => {
+    if (interiorMachine !== CAUSAL_INTERIOR || performance.now() < causalCooldownUntil || causalPhase !== 'play' || causalAttempts >= CAUSAL_ROUNDS) return;
+    if (index < 0 || index >= CAUSAL_GAUGES) return;
+    causalValues = stepCausalGauge(causalValues, index);
+    renderCausalConsole(isCausalConverged(causalValues) ? 'DRIFT · SYNC可能' : `DRIFT · SPAN ${causalSpan(causalValues)}`, false);
+  },
+  lockCausalCollapse: () => {
+    const now = performance.now();
+    if (interiorMachine !== CAUSAL_INTERIOR || now < causalCooldownUntil || causalPhase !== 'play' || causalAttempts >= CAUSAL_ROUNDS) return;
+    const success = isCausalConverged(causalValues);
+    causalResults.push(success);
+    if (success) causalSuccesses += 1;
+    causalAttempts += 1;
+    causalPhase = 'result';
+    renderCausalConsole(success ? 'SINGULAR · 指標が収束' : 'SPLIT · 値が揃っていない', true);
+    if (causalAttempts >= CAUSAL_ROUNDS) {
+      const reward = applyCausalCollapseReward(state, causalSuccesses);
+      causalCooldownUntil = now + CAUSAL_COOLDOWN_MS;
+      causalPhase = 'cooldown';
+      const message = `因果収束：${causalSuccesses} / ${CAUSAL_ROUNDS}成功${reward > 0 ? ` +${Math.floor(reward).toLocaleString('ja-JP')}クリップ` : ''}`;
+      ui.setInteriorStatus(message);
+      ui.announce(message, causalSuccesses > 0 ? 'success' : 'warning');
+      ui.addLog('CAUSE', message);
+      renderCausalConsole('STANDBY · 再収束待機', true);
+      updateProgressionEvents();
+      ui.render(state, true);
+      saveGame(state);
+    } else {
+      causalNextRoundAt = now + CAUSAL_RESULT_MS;
+    }
+  },
   changePurchaseMode: (mode) => {
     state.purchaseMode = mode;
     ui.addLog('MODE', `購入数量を${mode === 'max' ? 'MAX' : `×${mode}`}へ変更`);
@@ -1027,6 +1096,7 @@ const ui = new GameUi(app, {
     planetCooldownUntil = 0;
     stellarCooldownUntil = 0;
     fleetCooldownUntil = 0;
+    causalCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1068,6 +1138,7 @@ const ui = new GameUi(app, {
     planetCooldownUntil = 0;
     stellarCooldownUntil = 0;
     fleetCooldownUntil = 0;
+    causalCooldownUntil = 0;
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1375,6 +1446,20 @@ const loop = new GameLoop((elapsedSeconds) => {
     } else if (fleetPhase === 'result' && fleetNextRoundAt > 0 && now >= fleetNextRoundAt) {
       fleetRound += 1;
       beginFleetRound();
+    }
+  }
+  if (interiorMachine === CAUSAL_INTERIOR) {
+    if (now < causalCooldownUntil) {
+      renderCausalConsole(`再収束待機 · 残り${Math.ceil((causalCooldownUntil - now) / 1000)}秒`, true);
+    } else if (causalPhase === 'cooldown') {
+      causalRound = 1;
+      causalSuccesses = 0;
+      causalAttempts = 0;
+      causalResults = [];
+      beginCausalRound();
+    } else if (causalPhase === 'result' && causalNextRoundAt > 0 && now >= causalNextRoundAt) {
+      causalRound += 1;
+      beginCausalRound();
     }
   }
   ui.render(state);

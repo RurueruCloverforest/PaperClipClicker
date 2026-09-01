@@ -248,6 +248,7 @@ try {
   assert.equal(legacyLoaded.state.planetStripSuccesses, 0);
   assert.equal(legacyLoaded.state.stellarSyncSuccesses, 0);
   assert.equal(legacyLoaded.state.fleetSpreadSuccesses, 0);
+  assert.equal(legacyLoaded.state.causalCollapseSuccesses, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);
@@ -387,6 +388,17 @@ try {
   assert.equal(fleetReward, 12_000);
   assert.equal(fleetState.fleetSpreadSuccesses, 3);
   assert.equal(fleetState.clips, 12_000);
+  assert.deepEqual(interior.randomCausalGauges(() => 0), [0, 1, 2, 3]);
+  assert.equal(interior.isCausalConverged([2, 2, 2, 2]), true);
+  assert.equal(interior.isCausalConverged([0, 1, 2, 3]), false);
+  assert.deepEqual(interior.incrementCausalGauge([0, 1, 2, 3], 0), [1, 1, 2, 3]);
+  assert.deepEqual(interior.incrementCausalGauge([0, 1, 2, 3], 3), [0, 1, 2, 0]);
+  assert.equal(interior.causalSpan([0, 1, 2, 3]), 3);
+  const causalState = createInitialState(0);
+  const causalReward = interior.applyCausalCollapseReward(causalState, 3);
+  assert.equal(causalReward, 13_500);
+  assert.equal(causalState.causalCollapseSuccesses, 3);
+  assert.equal(causalState.clips, 13_500);
   assert.equal(point.x, 12);
   assert.equal(point.y, 18);
 
