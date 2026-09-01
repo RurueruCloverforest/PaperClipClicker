@@ -1,6 +1,7 @@
 import './style.css';
 import { createInitialState, MACHINE_IDS, type DirectiveId, type GameState, type MachineId, type SignalBuffId, type SurveyId, type Theme, type UpgradeId } from './state';
 import { autoBuyTick, buyMachines, buyUpgrade, produceByClick, produceForDuration, productionPerSecond, updateUnlocks } from './game/clips';
+import { COMBO_MAX, comboExpired, comboMultiplier, nextCombo } from './game/combo';
 import { getMachine, getUpgrade } from './game/definitions';
 import { GameLoop } from './game/loop';
 import { deleteSave, loadGame, saveGame } from './save';
@@ -146,6 +147,8 @@ let causalPhase: 'play' | 'result' | 'cooldown' = 'play';
 let causalNextRoundAt = 0;
 let causalCooldownUntil = 0;
 let observedSignalBuffs = new Set(activeSignalBuffs(state));
+let clickCombo = 0;
+let lastClickAt = 0;
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -453,7 +456,19 @@ const applyTheme = (theme: Theme): void => {
 
 const ui = new GameUi(app, {
   makeClip: (event) => {
-    const { amount, critical } = produceByClick(state);
+    const now = performance.now();
+    clickCombo = nextCombo(clickCombo, lastClickAt, now);
+    lastClickAt = now;
+    const { amount, critical } = produceByClick(state, clickCombo);
+    if (clickCombo > state.maxClickCombo) {
+      state.maxClickCombo = clickCombo;
+      if (clickCombo >= 4 || clickCombo === COMBO_MAX) {
+        const message = `手動連鎖 ${clickCombo}、倍率 ×${comboMultiplier(clickCombo).toFixed(2)}`;
+        ui.announce(message, 'success');
+        ui.addLog('CHAIN', message);
+      }
+    }
+    ui.setClickCombo(clickCombo, comboMultiplier(clickCombo));
     advanceDirective(state, 'manualCalibration');
     updateProgressionEvents();
     const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1118,6 +1133,9 @@ const ui = new GameUi(app, {
     stellarCooldownUntil = 0;
     fleetCooldownUntil = 0;
     causalCooldownUntil = 0;
+    clickCombo = 0;
+    lastClickAt = 0;
+    ui.setClickCombo(0, 1);
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1160,6 +1178,9 @@ const ui = new GameUi(app, {
     stellarCooldownUntil = 0;
     fleetCooldownUntil = 0;
     causalCooldownUntil = 0;
+    clickCombo = 0;
+    lastClickAt = 0;
+    ui.setClickCombo(0, 1);
     ui.hideBonusEvent();
     ui.hidePrecisionTarget();
     ui.closeInteriorView();
@@ -1482,6 +1503,10 @@ const loop = new GameLoop((elapsedSeconds) => {
       causalRound += 1;
       beginCausalRound();
     }
+  }
+  if (comboExpired(clickCombo, lastClickAt, now)) {
+    clickCombo = 0;
+    ui.setClickCombo(0, 1);
   }
   ui.render(state);
 });

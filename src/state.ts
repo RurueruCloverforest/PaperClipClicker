@@ -41,6 +41,7 @@ export interface GameState {
   causalCollapseSuccesses: number;
   surveysRecovered: number;
   surveyReturnsAt: Record<SurveyId, number>;
+  maxClickCombo: number;
   signalBuffExpiresAt: Record<SignalBuffId, number>;
   directiveProgress: Record<DirectiveId, number>;
   directiveCompletions: Record<DirectiveId, number>;
@@ -82,6 +83,7 @@ export function createInitialState(now = Date.now()): GameState {
     causalCollapseSuccesses: 0,
     surveysRecovered: 0,
     surveyReturnsAt: { near: 0, mid: 0, far: 0 },
+    maxClickCombo: 0,
     signalBuffExpiresAt: { productionSurge: 0, precisionAssist: 0, signalBeacon: 0 },
     directiveProgress: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },
     directiveCompletions: { manualCalibration: 0, procurementOrder: 0, signalCapture: 0 },

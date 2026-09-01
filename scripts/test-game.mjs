@@ -6,6 +6,7 @@ const server = await createServer({ server: { middlewareMode: true }, appType: '
 try {
   const { createInitialState, MACHINE_IDS, UPGRADE_IDS } = await server.ssrLoadModule('/src/state.ts');
   const clips = await server.ssrLoadModule('/src/game/clips.ts');
+  const combo = await server.ssrLoadModule('/src/game/combo.ts');
   const progression = await server.ssrLoadModule('/src/game/progression.ts');
   const milestones = await server.ssrLoadModule('/src/game/milestones.ts');
   const achievements = await server.ssrLoadModule('/src/game/achievements.ts');
@@ -16,6 +17,18 @@ try {
   const survey = await server.ssrLoadModule('/src/game/survey.ts');
 
   const state = createInitialState(0);
+  assert.equal(combo.comboMultiplier(1), 1);
+  assert.equal(combo.comboMultiplier(2), 1.15);
+  assert.equal(combo.comboMultiplier(12), 2.65);
+  assert.equal(combo.comboMultiplier(99), 2.65);
+  assert.equal(combo.nextCombo(0, 0, 1000), 1);
+  assert.equal(combo.nextCombo(3, 1000, 1500), 4);
+  assert.equal(combo.nextCombo(3, 1000, 2000), 1);
+  assert.equal(combo.nextCombo(12, 1000, 1500), 12);
+  assert.equal(combo.comboExpired(4, 1000, 1701), true);
+  const comboClick = createInitialState(0);
+  const comboResult = clips.produceByClick(comboClick, 12);
+  assert.equal(comboResult.critical ? comboResult.amount / 5 : comboResult.amount, 2.65);
   assert.equal(clips.machinePrice(state, 'autoClipper'), 15);
   assert.equal(clips.machineBatchPrice(state, 'autoClipper', 2), 33);
 
@@ -267,6 +280,7 @@ try {
   assert.equal(legacyLoaded.state.fleetSpreadSuccesses, 0);
   assert.equal(legacyLoaded.state.causalCollapseSuccesses, 0);
   assert.equal(legacyLoaded.state.surveysRecovered, 0);
+  assert.equal(legacyLoaded.state.maxClickCombo, 0);
 
   const interior = await server.ssrLoadModule('/src/game/interior.ts');
   const interiorState = createInitialState(0);

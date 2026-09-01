@@ -84,6 +84,7 @@ function normalize(raw: unknown, now: number): GameState {
     fleetSpreadSuccesses: Math.floor(finite(raw.fleetSpreadSuccesses, 0)),
     causalCollapseSuccesses: Math.floor(finite(raw.causalCollapseSuccesses, 0)),
     surveysRecovered: Math.floor(finite(raw.surveysRecovered, 0)),
+    maxClickCombo: Math.floor(finite(raw.maxClickCombo, 0)),
     surveyReturnsAt: (() => {
       const stored = isRecord(raw.surveyReturnsAt) ? raw.surveyReturnsAt : {};
       const result = { ...initial.surveyReturnsAt };

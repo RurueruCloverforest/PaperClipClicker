@@ -4,6 +4,7 @@ import { milestoneStatus } from './milestones';
 import { achievementProductionMultiplier } from './achievements';
 import { signalClickMultiplier, signalEquipmentMultiplier } from './signalLab';
 import { rebootMultiplier } from './reboot';
+import { comboMultiplier } from './combo';
 
 export function machinePrice(state: GameState, id: MachineId): number {
   const machine = getMachine(id);
@@ -47,9 +48,9 @@ export function machineTotalProduction(state: GameState, id: MachineId): number 
   return state.machines[id] * machineUnitProduction(state, id);
 }
 
-export function produceByClick(state: GameState): { amount: number; critical: boolean } {
+export function produceByClick(state: GameState, combo = 1): { amount: number; critical: boolean } {
   const critical = Math.random() < criticalChance(state);
-  const amount = critical ? clickProduction(state) * criticalMultiplier(state) : clickProduction(state);
+  const amount = clickProduction(state) * comboMultiplier(combo) * (critical ? criticalMultiplier(state) : 1);
   state.clips += amount;
   state.totalClips += amount;
   return { amount, critical };
